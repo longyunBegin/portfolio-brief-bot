@@ -1,0 +1,9 @@
+{
+  "_comment": "可选的股票白/黑名单配置。若券商 API 已返回持仓，则以券商为准；此处用于补充过滤或 mock 场景。",
+  "watch": [
+    { "code": "600519", "name": "贵州茅台", "holdShares": 100, "costPrice": 1700.0 },
+    { "code": "000858", "name": "五粮液", "holdShares": 200, "costPrice": 150.0 },
+    { "code": "300750", "name": "宁德时代", "holdShares": 50, "costPrice": 200.0 }
+  ],
+  "blacklist": []
+}

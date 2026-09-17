@@ -1,0 +1,8 @@
+node_modules/
+.env
+.ibkr_refresh_token
+preview.html
+*.log
+*.txt
+.DS_Store
+.codeartsdoer/

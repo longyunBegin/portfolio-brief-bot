@@ -1,0 +1,15 @@
+{
+  "name": "portfolio-brief-bot",
+  "version": "1.0.0",
+  "description": "持仓股收盘涨跌定时邮件通知机器人（腾讯云 SCF + GLM + SMTP，零依赖）",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "local": "node src/index.js --local",
+    "test": "node --test test/"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=18"
+  }
+}
