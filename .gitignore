@@ -1,4 +1,5 @@
 node_modules/
+package-lock.json
 .env
 .ibkr_refresh_token
 preview.html

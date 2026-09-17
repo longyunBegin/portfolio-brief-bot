@@ -1,32 +1,35 @@
 const crypto = require('crypto');
 const https = require('https');
-const { URL } = require('url');
 
-function hmacSha1(key, data) {
-  return crypto.createHmac('sha1', key).update(data).digest('hex');
-}
-
-function sha1(data) {
-  return crypto.createHash('sha1').update(data).digest('hex');
+function camSafeUrlEncode(str) {
+  return encodeURIComponent(str).replace(/!/g, '%21').replace(/\*/g, '%2A').replace(/'/g, '%27').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
 function buildAuth(method, host, uri, secretId, secretKey) {
   const now = Math.floor(Date.now() / 1000);
-  const expire = now + 600;
+  const expire = now + 900;
   const keyTime = now + ';' + expire;
-  const canonicalHeaders = 'host:' + host + '\n';
-  const signedHeaders = 'host';
-  const formatString = method + '\n' + uri + '\n\n' + canonicalHeaders + '\n' + signedHeaders + '\n';
-  const stringToSign = 'sha1\n' + keyTime + '\n' + sha1(formatString) + '\n';
-  const signKey = hmacSha1(secretKey, keyTime);
-  const signature = hmacSha1(signKey, stringToSign);
-  return 'q-sign-algorithm=sha1&q-ak=' + secretId + '&q-sign-time=' + keyTime + '&q-key-time=' + keyTime + '&q-header-list=' + signedHeaders + '&q-url-param-list=&q-signature=' + signature;
+  const headerStr = 'host=' + camSafeUrlEncode(host);
+  const formatString = [method.toLowerCase(), uri, '', headerStr, ''].join('\n');
+  const signKey = crypto.createHmac('sha1', secretKey).update(keyTime).digest('hex');
+  const hashedFormat = crypto.createHash('sha1').update(formatString).digest('hex');
+  const stringToSign = ['sha1', keyTime, hashedFormat, ''].join('\n');
+  const signature = crypto.createHmac('sha1', signKey).update(stringToSign).digest('hex');
+  return [
+    'q-sign-algorithm=sha1',
+    'q-ak=' + secretId,
+    'q-sign-time=' + keyTime,
+    'q-key-time=' + keyTime,
+    'q-header-list=host',
+    'q-url-param-list=',
+    'q-signature=' + signature,
+  ].join('&');
 }
 
 function request(method, host, uri, { headers = {}, body = null, secretId, secretKey, timeout = 10000 } = {}) {
   return new Promise((resolve, reject) => {
     const auth = buildAuth(method, host, uri, secretId, secretKey);
-    const allHeaders = Object.assign({ host, Authorization: auth }, headers);
+    const allHeaders = Object.assign({ Host: host, Authorization: auth }, headers);
     const data = body == null ? null : Buffer.from(String(body));
     if (data) allHeaders['Content-Length'] = data.length;
     const req = https.request({ method, hostname: host, path: uri, headers: allHeaders }, (res) => {
@@ -43,13 +46,13 @@ function request(method, host, uri, { headers = {}, body = null, secretId, secre
 
 function cosGet({ secretId, secretKey, bucket, region, key }) {
   const host = bucket + '.cos.' + region + '.myqcloud.com';
-  const uri = '/' + encodeURIComponent(key);
+  const uri = '/' + camSafeUrlEncode(key);
   return request('GET', host, uri, { secretId, secretKey });
 }
 
 function cosPut({ secretId, secretKey, bucket, region, key, content }) {
   const host = bucket + '.cos.' + region + '.myqcloud.com';
-  const uri = '/' + encodeURIComponent(key);
+  const uri = '/' + camSafeUrlEncode(key);
   return request('PUT', host, uri, {
     secretId, secretKey,
     headers: { 'Content-Type': 'text/plain' },
