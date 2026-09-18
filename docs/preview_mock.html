@@ -1,0 +1,195 @@
+
+<style>
+  .pnl-amt { display: none; }
+  #pnl-toggle:checked ~ .pnl-wrap .pnl-amt { display: inline; }
+  .cost-info { display: none; }
+  #pnl-toggle:checked ~ .pnl-wrap .cost-info { display: inline; }
+  .chart-all-expanded { display: none; }
+  #chart-all:checked ~ .pnl-wrap .chart-all-expanded { display: inline; }
+  #chart-all:checked ~ .pnl-wrap .chart-all-collapsed { display: none; }
+  .ic-0 { display: block; }
+  #chart-all:checked ~ .pnl-wrap .ic-0 { display: none; }
+  .ic-1 { display: block; }
+  #chart-all:checked ~ .pnl-wrap .ic-1 { display: none; }
+  .ic-2 { display: block; }
+  #chart-all:checked ~ .pnl-wrap .ic-2 { display: none; }
+  .ic-3 { display: block; }
+  #chart-all:checked ~ .pnl-wrap .ic-3 { display: none; }
+  .ic-4 { display: block; }
+  #chart-all:checked ~ .pnl-wrap .ic-4 { display: none; }
+</style>
+<input type="checkbox" id="pnl-toggle" style="display:none;">
+<input type="checkbox" id="chart-all" style="display:none;">
+<div class="pnl-wrap" style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;background:#f5f5f7;color:#1d1d1f;">
+  
+  <div style="background:#ffffff;border-radius:14px;padding:28px 24px;margin-bottom:10px;">
+    <div style="font-size:24px;font-weight:600;letter-spacing:-0.5px;color:#1d1d1f;">Portfolio Brief</div>
+    <div style="font-size:13px;color:#86868b;margin-top:4px;">2026-09-17 · Close Summary</div>
+    <div style="margin-top:20px;display:flex;gap:32px;">
+      <div>
+        <div style="font-size:11px;color:#86868b;text-transform:uppercase;letter-spacing:0.5px;">Market Value</div>
+        <div style="font-size:20px;font-weight:600;color:#1d1d1f;margin-top:2px;">$255428</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#86868b;text-transform:uppercase;letter-spacing:0.5px;">Total P&amp;L</div>
+        <div style="font-size:20px;font-weight:600;color:#ff3b30;margin-top:2px;">-1.19%</div>
+        <div style="font-size:14px;font-weight:500;color:#ff3b30;margin-top:1px;" class="pnl-amt">$-3072</div>
+      </div>
+    </div>
+    <div style="margin-top:14px;">
+      <label for="pnl-toggle" style="display:inline-block;font-size:12px;color:#0071e3;cursor:pointer;user-select:none;">▸ Show P&amp;L &amp; Cost</label>
+    </div>
+  </div>
+  
+  <div style="background:#ffffff;border-radius:14px;padding:20px 24px;margin-bottom:10px;">
+    <div style="font-size:11px;color:#86868b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Market Map</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;"><div style="background:#fcebeb;border-radius:8px;padding:10px 8px;text-align:center;flex:1 1 0;min-width:80px;">
+      <div style="font-size:13px;font-weight:600;color:#1d1d1f;">000001</div>
+      <div style="font-size:13px;font-weight:600;color:#ff3b30;margin-top:2px;">-0.28%</div>
+    </div><div style="background:#fcebeb;border-radius:8px;padding:10px 8px;text-align:center;flex:1 1 0;min-width:80px;">
+      <div style="font-size:13px;font-weight:600;color:#1d1d1f;">601318</div>
+      <div style="font-size:13px;font-weight:600;color:#ff3b30;margin-top:2px;">-0.31%</div>
+    </div><div style="background:#fcebeb;border-radius:8px;padding:10px 8px;text-align:center;flex:1 1 0;min-width:80px;">
+      <div style="font-size:13px;font-weight:600;color:#1d1d1f;">600519</div>
+      <div style="font-size:13px;font-weight:600;color:#ff3b30;margin-top:2px;">-0.32%</div>
+    </div><div style="background:#fcebeb;border-radius:8px;padding:10px 8px;text-align:center;flex:1 1 0;min-width:80px;">
+      <div style="font-size:13px;font-weight:600;color:#1d1d1f;">000858</div>
+      <div style="font-size:13px;font-weight:600;color:#ff3b30;margin-top:2px;">-0.32%</div>
+    </div><div style="background:#fcebeb;border-radius:8px;padding:10px 8px;text-align:center;flex:1 1 0;min-width:80px;">
+      <div style="font-size:13px;font-weight:600;color:#1d1d1f;">300750</div>
+      <div style="font-size:13px;font-weight:600;color:#ff3b30;margin-top:2px;">-0.32%</div>
+    </div></div>
+  </div>
+  <div style="background:#ffffff;border-radius:14px;padding:8px 24px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px;">
+      <div style="font-size:11px;color:#86868b;text-transform:uppercase;letter-spacing:0.5px;">Positions</div>
+      <label for="chart-all" style="font-size:12px;font-weight:500;color:#0071e3;background:rgba(0,113,227,0.08);border-radius:999px;padding:4px 14px;cursor:pointer;user-select:none;"><span class="chart-all-collapsed">Collapse Charts</span><span class="chart-all-expanded">Expand Charts</span></label>
+    </div>
+    
+  <div style="display:flex;align-items:center;padding:14px 0;border-bottom:1px solid #d2d2d7;">
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:600;color:#1d1d1f;">600519</div>
+      <div style="font-size:12px;color:#86868b;margin-top:1px;">100 shares · $1680.11<span class="cost-info"> · cost $1700.00</span></div>
+    </div>
+    <div style="width:100px;margin:0 12px;">
+      <div style="background:#f5f5f7;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="background:#ff3b30;height:100%;width:3.2%;border-radius:3px;"></div>
+      </div>
+    </div>
+    <div style="width:100px;text-align:right;">
+      <div style="font-size:15px;font-weight:600;color:#ff3b30;">-0.32%</div>
+      <div style="font-size:12px;color:#ff3b30;margin-top:1px;"><span class="pnl-amt">$-1989 </span>(-1.17%)</div>
+    </div>
+  </div>
+    <div class="ic-0" style="padding:8px 0 4px;">
+      <img src="data:image/png;base64,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" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="chart"/>
+      <div style="font-size:9px;color:#86868b;margin-top:3px;">
+        H <span style="color:#34c759;font-weight:600;">$1699.89</span>
+        · M <span style="color:#86868b;">$1684.52</span>
+        · L <span style="color:#ff3b30;font-weight:600;">$1669.14</span>
+        · prev <span style="color:#86868b;">$1685.50</span>
+      </div>
+    </div>
+  <div style="display:flex;align-items:center;padding:14px 0;border-bottom:1px solid #d2d2d7;">
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:600;color:#1d1d1f;">000858</div>
+      <div style="font-size:12px;color:#86868b;margin-top:1px;">300 shares · $147.73<span class="cost-info"> · cost $150.00</span></div>
+    </div>
+    <div style="width:100px;margin:0 12px;">
+      <div style="background:#f5f5f7;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="background:#ff3b30;height:100%;width:3.2%;border-radius:3px;"></div>
+      </div>
+    </div>
+    <div style="width:100px;text-align:right;">
+      <div style="font-size:15px;font-weight:600;color:#ff3b30;">-0.32%</div>
+      <div style="font-size:12px;color:#ff3b30;margin-top:1px;"><span class="pnl-amt">$-681 </span>(-1.51%)</div>
+    </div>
+  </div>
+    <div class="ic-1" style="padding:8px 0 4px;">
+      <img src="data:image/png;base64,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" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="chart"/>
+      <div style="font-size:9px;color:#86868b;margin-top:3px;">
+        H <span style="color:#34c759;font-weight:600;">$149.47</span>
+        · M <span style="color:#86868b;">$148.11</span>
+        · L <span style="color:#ff3b30;font-weight:600;">$146.75</span>
+        · prev <span style="color:#86868b;">$148.20</span>
+      </div>
+    </div>
+  <div style="display:flex;align-items:center;padding:14px 0;border-bottom:1px solid #d2d2d7;">
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:600;color:#1d1d1f;">300750</div>
+      <div style="font-size:12px;color:#86868b;margin-top:1px;">50 shares · $197.96<span class="cost-info"> · cost $200.00</span></div>
+    </div>
+    <div style="width:100px;margin:0 12px;">
+      <div style="background:#f5f5f7;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="background:#ff3b30;height:100%;width:3.2%;border-radius:3px;"></div>
+      </div>
+    </div>
+    <div style="width:100px;text-align:right;">
+      <div style="font-size:15px;font-weight:600;color:#ff3b30;">-0.32%</div>
+      <div style="font-size:12px;color:#ff3b30;margin-top:1px;"><span class="pnl-amt">$-102 </span>(-1.02%)</div>
+    </div>
+  </div>
+    <div class="ic-2" style="padding:8px 0 4px;">
+      <img src="data:image/png;base64,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" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="chart"/>
+      <div style="font-size:9px;color:#86868b;margin-top:3px;">
+        H <span style="color:#34c759;font-weight:600;">$200.30</span>
+        · M <span style="color:#86868b;">$198.48</span>
+        · L <span style="color:#ff3b30;font-weight:600;">$196.66</span>
+        · prev <span style="color:#86868b;">$198.60</span>
+      </div>
+    </div>
+  <div style="display:flex;align-items:center;padding:14px 0;border-bottom:1px solid #d2d2d7;">
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:600;color:#1d1d1f;">601318</div>
+      <div style="font-size:12px;color:#86868b;margin-top:1px;">500 shares · $44.66<span class="cost-info"> · cost $45.00</span></div>
+    </div>
+    <div style="width:100px;margin:0 12px;">
+      <div style="background:#f5f5f7;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="background:#ff3b30;height:100%;width:3.1%;border-radius:3px;"></div>
+      </div>
+    </div>
+    <div style="width:100px;text-align:right;">
+      <div style="font-size:15px;font-weight:600;color:#ff3b30;">-0.31%</div>
+      <div style="font-size:12px;color:#ff3b30;margin-top:1px;"><span class="pnl-amt">$-170 </span>(-0.76%)</div>
+    </div>
+  </div>
+    <div class="ic-3" style="padding:8px 0 4px;">
+      <img src="data:image/png;base64,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" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="chart"/>
+      <div style="font-size:9px;color:#86868b;margin-top:3px;">
+        H <span style="color:#34c759;font-weight:600;">$45.19</span>
+        · M <span style="color:#86868b;">$44.77</span>
+        · L <span style="color:#ff3b30;font-weight:600;">$44.36</span>
+        · prev <span style="color:#86868b;">$44.80</span>
+      </div>
+    </div>
+  <div style="display:flex;align-items:center;padding:14px 0;">
+    <div style="flex:1;">
+      <div style="font-size:15px;font-weight:600;color:#1d1d1f;">000001</div>
+      <div style="font-size:12px;color:#86868b;margin-top:1px;">1000 shares · $10.87<span class="cost-info"> · cost $11.00</span></div>
+    </div>
+    <div style="width:100px;margin:0 12px;">
+      <div style="background:#f5f5f7;border-radius:3px;height:5px;overflow:hidden;">
+        <div style="background:#ff3b30;height:100%;width:2.8%;border-radius:3px;"></div>
+      </div>
+    </div>
+    <div style="width:100px;text-align:right;">
+      <div style="font-size:15px;font-weight:600;color:#ff3b30;">-0.28%</div>
+      <div style="font-size:12px;color:#ff3b30;margin-top:1px;"><span class="pnl-amt">$-130 </span>(-1.18%)</div>
+    </div>
+  </div>
+    <div class="ic-4" style="padding:8px 0 4px;">
+      <img src="data:image/png;base64,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" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="chart"/>
+      <div style="font-size:9px;color:#86868b;margin-top:3px;">
+        H <span style="color:#34c759;font-weight:600;">$11.00</span>
+        · M <span style="color:#86868b;">$10.89</span>
+        · L <span style="color:#ff3b30;font-weight:600;">$10.79</span>
+        · prev <span style="color:#86868b;">$10.90</span>
+      </div>
+    </div>
+  </div>
+  <div style="background:#ffffff;border-radius:14px;padding:16px 24px;margin-bottom:10px;">
+    <div style="font-size:11px;color:#86868b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Summary</div>
+    <div style="font-size:14px;line-height:1.5;color:#1d1d1f;">5 positions · 0 up / 5 down · low 300750 -0.32%</div>
+  </div>
+  <div style="text-align:center;font-size:11px;color:#86868b;padding:8px 0;">portfolio-brief-bot</div>
+</div>

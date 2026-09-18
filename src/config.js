@@ -63,6 +63,7 @@ const config = {
     clientId: getEnv('IBKR_CLIENT_ID', ''),
   },
   cos: {
+    enabled: getBool('COS_ENABLED', false),
     secretId: getEnv('COS_SECRET_ID', ''),
     secretKey: getEnv('COS_SECRET_KEY', ''),
     bucket: getEnv('COS_BUCKET', ''),

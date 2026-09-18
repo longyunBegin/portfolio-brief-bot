@@ -34,8 +34,33 @@ function buildMockPositions(tradeDate) {
       costValue,
       profit,
       profitPercent,
+      intraday: buildMockIntraday(it.prevClose, close, seed),
     };
   });
+}
+
+function buildMockIntraday(prevClose, close, seed) {
+  const bars = [];
+  const numBars = 78;
+  const baseTime = 570;
+  for (let i = 0; i < numBars; i++) {
+    const progress = i / (numBars - 1);
+    const trend = prevClose + (close - prevClose) * progress;
+    const wave = Math.sin(progress * Math.PI * 4 + seed * 6) * prevClose * 0.003;
+    const noise = (Math.sin(i * 2.7 + seed * 10) + Math.cos(i * 1.3)) * prevClose * 0.0015;
+    const price = Number((trend + wave + noise).toFixed(2));
+    const high = Number((price + Math.abs(noise) + 0.01).toFixed(2));
+    const low = Number((price - Math.abs(noise) - 0.01).toFixed(2));
+    bars.push({
+      time: (baseTime + i * 5) * 60,
+      open: price,
+      high,
+      low,
+      close: price,
+      volume: Math.floor(10000 + Math.sin(i * 3.1) * 5000 + 5000),
+    });
+  }
+  return bars;
 }
 
 function summarize(positions) {
@@ -114,6 +139,7 @@ async function getPositionsAndQuote(referenceDate) {
       costValue: Number((w.costPrice * w.holdShares).toFixed(2)),
       profit: 0,
       profitPercent: 0,
+      intraday: [],
     }));
   }
 

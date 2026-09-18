@@ -7,3 +7,8 @@ preview.html
 *.txt
 .DS_Store
 .codeartsdoer/
+real_data.json
+fetch_real_data.js
+generate_preview.js
+send_test.js
+test_*.js

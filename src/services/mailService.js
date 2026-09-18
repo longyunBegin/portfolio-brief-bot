@@ -3,7 +3,7 @@ const { smtpDialog } = require('../utils/smtpClient');
 
 function buildSubject(tradeDate, summary) {
   const sign = summary.totalProfitPercent >= 0 ? '+' : '';
-  return `【持仓简报】${tradeDate} 总盈亏 ${sign}${summary.totalProfitPercent}%`;
+  return `[Portfolio Brief] ${tradeDate} P&L ${sign}${summary.totalProfitPercent}%`;
 }
 
 async function sendHtmlMail({ subject, html, to }) {

@@ -1,3 +1,5 @@
+const { buildChartBase64 } = require('./pngChart');
+
 function fmt(n, digits = 2) {
   if (n === null || n === undefined || Number.isNaN(n)) return '-';
   return Number(n).toFixed(digits);
@@ -95,7 +97,7 @@ function buildHeader(data) {
       </div>
     </div>
     <div style="margin-top:14px;">
-      <label for="pnl-toggle" style="display:inline-block;font-size:12px;color:${COLOR.blue};cursor:pointer;user-select:none;">\u25B8 显示盈亏金额</label>
+      <label for="pnl-toggle" style="display:inline-block;font-size:12px;color:${COLOR.blue};cursor:pointer;user-select:none;">\u25B8 Show P&amp;L &amp; Cost</label>
     </div>
   </div>`;
 }
@@ -118,7 +120,7 @@ function buildMarketMap(positions) {
   </div>`;
 }
 
-function buildPositionRow(p, isLast) {
+function buildPositionRow(p, idx, isLast) {
   const color = changeColor(p.changePercent);
   const width = barWidth(p.changePercent);
   const sign = p.changePercent > 0 ? '+' : '';
@@ -126,11 +128,13 @@ function buildPositionRow(p, isLast) {
   const pColor = p.profit >= 0 ? COLOR.up : COLOR.down;
   const pSign = p.profit >= 0 ? '+' : '';
   const border = isLast ? '' : `border-bottom:1px solid ${COLOR.border};`;
+  const hasChart = p.intraday && p.intraday.length > 1;
+  const chart = hasChart ? buildIntradayChart(p, idx) : '';
   return `
   <div style="display:flex;align-items:center;padding:14px 0;${border}">
     <div style="flex:1;">
       <div style="font-size:15px;font-weight:600;color:${COLOR.text};">${p.code}</div>
-      <div style="font-size:12px;color:${COLOR.sub};margin-top:1px;">${fmt(p.holdShares, 0)} shares \u00B7 ${sym}${fmt(p.close)}</div>
+      <div style="font-size:12px;color:${COLOR.sub};margin-top:1px;">${fmt(p.holdShares, 0)} shares \u00B7 ${sym}${fmt(p.close)}<span class="cost-info"> \u00B7 cost ${sym}${fmt(p.costPrice)}</span></div>
     </div>
     <div style="width:100px;margin:0 12px;">
       <div style="background:${COLOR.bg};border-radius:3px;height:5px;overflow:hidden;">
@@ -141,7 +145,53 @@ function buildPositionRow(p, isLast) {
       <div style="font-size:15px;font-weight:600;color:${color};">${sign}${fmt(p.changePercent)}%</div>
       <div style="font-size:12px;color:${pColor};margin-top:1px;"><span class="pnl-amt">${pSign}${sym}${fmt(p.profit, 0)} </span>(${pSign}${fmt(p.profitPercent)}%)</div>
     </div>
-  </div>`;
+  </div>${chart}`;
+}
+
+function fmtTime(time) {
+  let date;
+  if (typeof time === 'string') {
+    date = new Date(time);
+  } else if (time > 1e12) {
+    date = new Date(time);
+  } else if (time > 1e9) {
+    date = new Date(time * 1000);
+  } else {
+    const mins = time > 10000 ? Math.floor(time / 60) : time;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}:${m < 10 ? '0' + m : m}`;
+  }
+  try {
+    return new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+  } catch (_) {
+    const mins = date.getUTCHours() * 60 + date.getUTCMinutes() - 300;
+    const adj = mins < 0 ? mins + 1440 : mins;
+    const h = Math.floor(adj / 60);
+    const m = adj % 60;
+    return `${h}:${m < 10 ? '0' + m : m}`;
+  }
+}
+
+function buildIntradayChart(p, idx) {
+  const bars = p.intraday || [];
+  if (bars.length < 2) return '';
+  const dayHigh = Math.max.apply(null, bars.map((b) => b.high));
+  const dayLow = Math.min.apply(null, bars.map((b) => b.low));
+  const prevClose = p.prevClose || bars[0].close;
+  const sym = currencySymbol(p.currency);
+  const midLine = (dayHigh + dayLow) / 2;
+  const png64 = buildChartBase64(bars, prevClose, dayHigh, dayLow);
+  return `
+    <div class="ic-${idx}" style="padding:8px 0 4px;">
+      <img src="data:image/png;base64,${png64}" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="chart"/>
+      <div style="font-size:9px;color:${COLOR.sub};margin-top:3px;">
+        H <span style="color:${COLOR.up};font-weight:600;">${sym}${fmt(dayHigh)}</span>
+        \u00B7 M <span style="color:${COLOR.sub};">${sym}${fmt(midLine)}</span>
+        \u00B7 L <span style="color:${COLOR.down};font-weight:600;">${sym}${fmt(dayLow)}</span>
+        \u00B7 prev <span style="color:${COLOR.sub};">${sym}${fmt(prevClose)}</span>
+      </div>
+    </div>`;
 }
 
 function buildComment(data) {
@@ -162,19 +212,34 @@ function buildFallbackHtml(data) {
   const positions = data.positions || [];
   const header = buildHeader(data);
   const marketMap = buildMarketMap(positions);
-  const rows = positions.map((p, i) => buildPositionRow(p, i === positions.length - 1)).join('');
+  const rows = positions.map((p, i) => buildPositionRow(p, i, i === positions.length - 1)).join('');
   const comment = buildComment(data);
+  const chartIndices = positions.map((p, i) => (p.intraday && p.intraday.length > 1 ? i : -1)).filter((i) => i >= 0);
+  const chartCss = chartIndices.map((i) =>
+    `.ic-${i} { display: block; }\n  #chart-all:checked ~ .pnl-wrap .ic-${i} { display: none; }`
+  ).join('\n  ');
+  const hasCharts = chartIndices.length > 0;
   return `
 <style>
   .pnl-amt { display: none; }
   #pnl-toggle:checked ~ .pnl-wrap .pnl-amt { display: inline; }
+  .cost-info { display: none; }
+  #pnl-toggle:checked ~ .pnl-wrap .cost-info { display: inline; }
+  .chart-all-expanded { display: none; }
+  #chart-all:checked ~ .pnl-wrap .chart-all-expanded { display: inline; }
+  #chart-all:checked ~ .pnl-wrap .chart-all-collapsed { display: none; }
+  ${chartCss}
 </style>
 <input type="checkbox" id="pnl-toggle" style="display:none;">
+<input type="checkbox" id="chart-all" style="display:none;">
 <div class="pnl-wrap" style="font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;padding:20px;background:${COLOR.bg};color:${COLOR.text};">
   ${header}
   ${marketMap}
   <div style="background:${COLOR.card};border-radius:14px;padding:8px 24px;margin-bottom:10px;">
-    <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;padding:8px 0 4px;">Positions</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0 4px;">
+      <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Positions</div>
+      ${hasCharts ? `<label for="chart-all" style="font-size:12px;font-weight:500;color:${COLOR.blue};background:rgba(0,113,227,0.08);border-radius:999px;padding:4px 14px;cursor:pointer;user-select:none;"><span class="chart-all-collapsed">Collapse Charts</span><span class="chart-all-expanded">Expand Charts</span></label>` : ''}
+    </div>
     ${rows || `<div style="padding:32px 0;text-align:center;color:${COLOR.sub};font-size:14px;">No positions</div>`}
   </div>
   <div style="background:${COLOR.card};border-radius:14px;padding:16px 24px;margin-bottom:10px;">

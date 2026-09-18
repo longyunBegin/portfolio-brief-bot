@@ -1,4 +1,4 @@
-const https = require('https');
+
 const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
@@ -11,7 +11,7 @@ const TOKEN_ENDPOINT = 'https://api.ibkr.com/oauth2/api/v1/token';
 const RT_FILE = path.resolve(process.cwd(), '.ibkr_refresh_token');
 
 function hasCos() {
-  return config.cos.secretId && config.cos.secretKey && config.cos.bucket;
+  return config.cos.enabled && config.cos.secretId && config.cos.secretKey && config.cos.bucket;
 }
 
 async function getRefreshToken() {
@@ -55,27 +55,19 @@ async function saveRefreshToken(rt) {
   fs.writeFileSync(RT_FILE, rt, 'utf-8');
 }
 
-function httpsRequest(method, url, { headers = {}, body = null } = {}) {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const data = body == null ? null : Buffer.from(String(body));
-    const h = Object.assign({ 'Connection': 'close' }, headers);
-    if (data) h['Content-Length'] = data.length;
-    const req = https.request({
-      method,
-      hostname: u.hostname,
-      path: u.pathname + u.search,
-      headers: h,
-    }, (res) => {
-      let buf = '';
-      res.on('data', (c) => buf += c.toString());
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: buf }));
-    });
-    req.on('error', reject);
-    req.setTimeout(20000, () => req.destroy(new Error('IBKR 请求超时')));
-    if (data) req.write(data);
-    req.end();
-  });
+async function httpsRequest(method, url, { headers = {}, body = null } = {}) {
+  const opts = { method, headers: Object.assign({}, headers) };
+  if (body != null) opts.body = String(body);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20000);
+  opts.signal = controller.signal;
+  try {
+    const resp = await fetch(url, opts);
+    const text = await resp.text();
+    return { status: resp.status, headers: Object.fromEntries(resp.headers.entries()), body: text };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function exchangeToken() {
@@ -164,25 +156,108 @@ async function getPriceChange(contractId) {
   return data;
 }
 
-function toPositionRow(p, quote) {
+function normalizePriceHistory(data) {
+  if (!data) return [];
+  if (Array.isArray(data.time) && Array.isArray(data.close)) {
+    return data.time.map((t, i) => ({
+      time: new Date(t).getTime() / 1000,
+      open: Number(data.open ? data.open[i] : 0),
+      high: Number(data.high ? data.high[i] : 0),
+      low: Number(data.low ? data.low[i] : 0),
+      close: Number(data.close[i]),
+      volume: Number(data.volume ? data.volume[i] : 0),
+    })).filter((b) => b.close > 0);
+  }
+  const bars = data.data || data.bars || data.history || (Array.isArray(data) ? data : []);
+  return bars.map((b) => ({
+    time: b.t || b.time || b.timestamp || 0,
+    open: Number(b.o || b.open || 0),
+    high: Number(b.h || b.high || 0),
+    low: Number(b.l || b.low || 0),
+    close: Number(b.c || b.close || 0),
+    volume: Number(b.v || b.volume || 0),
+  })).filter((b) => b.close > 0);
+}
+
+async function getPriceHistory(contractId) {
+  const data = await callMcpTool('get_price_history', {
+    contract_id: contractId,
+    security_type: 'STK',
+    period: 'ONE_DAY',
+    step: 'FIVE_MINS',
+    outside_rth: false,
+  });
+  return normalizePriceHistory(data);
+}
+
+async function getDailyHistory(contractId) {
+  const data = await callMcpTool('get_price_history', {
+    contract_id: contractId,
+    security_type: 'STK',
+    period: 'THREE_DAYS',
+    step: 'ONE_DAY',
+    outside_rth: false,
+  });
+  return normalizePriceHistory(data);
+}
+
+function barToDateStr(time) {
+  let date;
+  if (typeof time === 'string') {
+    date = new Date(time);
+  } else if (time > 1e12) {
+    date = new Date(time);
+  } else if (time > 1e9) {
+    date = new Date(time * 1000);
+  } else {
+    return null;
+  }
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
+    const y = parts.find((p) => p.type === 'year').value;
+    const m = parts.find((p) => p.type === 'month').value;
+    const d = parts.find((p) => p.type === 'day').value;
+    return `${y}-${m}-${d}`;
+  } catch (_) {
+    return null;
+  }
+}
+
+function toPositionRow(p, dailyBars, tradeDateStr) {
   const code = p.contract_description || String(p.contract_id);
   const holdShares = Number(p.position) || 0;
   const costPrice = Number(p.average_price) || 0;
-  const lastPrice = quote && quote['last'] ? Number(quote['last'].price) : 0;
-  const close = Number(p.market_price) || lastPrice || 0;
-  const prevClose = quote && quote['prior-close'] && quote['prior-close'].price ? Number(quote['prior-close'].price) : 0;
-  let changePercent = 0;
-  let changeAmount = 0;
-  if (quote && quote['change']) {
-    const ch = quote['change'];
-    if (ch['change_pct'] != null) changePercent = Number(ch['change_pct']);
-    if (ch['change'] != null) changeAmount = Number(ch['change']);
+  let close = 0;
+  let prevClose = 0;
+  if (dailyBars && dailyBars.length >= 1) {
+    let targetIdx = dailyBars.length - 1;
+    if (tradeDateStr) {
+      for (let i = dailyBars.length - 1; i >= 0; i--) {
+        if (barToDateStr(dailyBars[i].time) === tradeDateStr) {
+          targetIdx = i;
+          break;
+        }
+      }
+      const matched = barToDateStr(dailyBars[targetIdx].time);
+      if (matched && matched !== tradeDateStr) {
+        console.warn(`[ibkr] ${code} 日K线日期 ${matched} 与期望交易日 ${tradeDateStr} 不匹配，使用最近一根`);
+      }
+    }
+    close = dailyBars[targetIdx].close;
+    if (targetIdx > 0) {
+      prevClose = dailyBars[targetIdx - 1].close;
+    }
   }
-  if (!changePercent && prevClose) changePercent = ((close - prevClose) / prevClose) * 100;
-  if (!changeAmount && prevClose) changeAmount = close - prevClose;
-  const marketValue = Number(p.market_value) || close * holdShares;
+  if (!close) close = Number(p.market_price) || 0;
+  let changeAmount = 0;
+  let changePercent = 0;
+  if (prevClose) {
+    changeAmount = close - prevClose;
+    changePercent = (changeAmount / prevClose) * 100;
+  }
+  const marketValue = close * holdShares;
   const costValue = costPrice * holdShares;
-  const profit = Number(p.unrealized_pnl) || marketValue - costValue;
+  const profit = marketValue - costValue;
   const profitPercent = costValue ? (profit / costValue) * 100 : 0;
   return {
     code,
@@ -220,19 +295,26 @@ function summarize(positions) {
 
 async function getPositionsAndQuote(referenceDate) {
   const tradeDate = getPreviousTradeDate(referenceDate || new Date());
-  console.log('[ibkr] 刷新 token 并获取持仓...');
+  const tradeDateStr = toDateStr(tradeDate);
+  console.log('[ibkr] 刷新 token 并获取持仓... 期望交易日:', tradeDateStr);
   const rawPositions = await getPositions();
-  console.log(`[ibkr] 获取到 ${rawPositions.length} 个持仓，开始获取行情...`);
-  const rows = [];
-  for (const p of rawPositions) {
-    let quote = null;
-    try {
-      quote = await getPriceChange(p.contract_id);
-    } catch (e) {
-      console.warn(`[ibkr] ${p.contract_description} 行情获取失败: ${e.message}`);
-    }
-    rows.push(toPositionRow(p, quote));
-  }
+  console.log(`[ibkr] 获取到 ${rawPositions.length} 个持仓，并行获取日K线与走势...`);
+  const tasks = rawPositions.map(async (p) => {
+    const [dailyBars, history] = await Promise.all([
+      getDailyHistory(p.contract_id).catch((e) => {
+        console.warn(`[ibkr] ${p.contract_description} 日K线获取失败: ${e.message}`);
+        return [];
+      }),
+      getPriceHistory(p.contract_id).catch((e) => {
+        console.warn(`[ibkr] ${p.contract_description} 走势获取失败: ${e.message}`);
+        return [];
+      }),
+    ]);
+    const row = toPositionRow(p, dailyBars, tradeDateStr);
+    row.intraday = history;
+    return row;
+  });
+  const rows = await Promise.all(tasks);
   const summary = summarize(rows);
   return { tradeDate, positions: rows, summary };
 }
@@ -241,5 +323,9 @@ module.exports = {
   getPositionsAndQuote,
   getPositions,
   getPriceChange,
+  getPriceHistory,
+  getDailyHistory,
   callMcpTool,
+  toPositionRow,
+  summarize,
 };
