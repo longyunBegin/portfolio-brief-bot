@@ -1,6 +1,7 @@
 const { get } = require('../utils/httpClient');
 const config = require('../config');
 const { getPreviousTradeDate, toDateStr } = require('../utils/tradeDateUtil');
+const { summarize } = require('../utils/summary');
 
 function buildMockPositions(tradeDate) {
   const dateStr = toDateStr(tradeDate);
@@ -63,25 +64,6 @@ function buildMockIntraday(prevClose, close, seed) {
   return bars;
 }
 
-function summarize(positions) {
-  const totalMarketValue = positions.reduce((s, p) => s + p.marketValue, 0);
-  const totalCostValue = positions.reduce((s, p) => s + p.costValue, 0);
-  const totalProfit = Number((totalMarketValue - totalCostValue).toFixed(2));
-  const totalProfitPercent = Number(((totalProfit / totalCostValue) * 100).toFixed(2));
-  const upCount = positions.filter((p) => p.changePercent > 0).length;
-  const downCount = positions.filter((p) => p.changePercent < 0).length;
-  const flatCount = positions.filter((p) => p.changePercent === 0).length;
-  return {
-    totalMarketValue: Number(totalMarketValue.toFixed(2)),
-    totalCostValue: Number(totalCostValue.toFixed(2)),
-    totalProfit,
-    totalProfitPercent,
-    upCount,
-    downCount,
-    flatCount,
-  };
-}
-
 async function fetchPositionsFromBroker(tradeDate) {
   const base = config.broker.apiBase;
   const token = config.broker.apiToken;
@@ -115,6 +97,7 @@ async function getPositionsAndQuote(referenceDate) {
     const result = await ibkr.getPositionsAndQuote(referenceDate);
     const blacklist = new Set((config.stocks.blacklist || []).map((b) => b.code || b));
     result.positions = result.positions.filter((p) => !blacklist.has(p.code));
+    result.summary = summarize(result.positions);
     return result;
   }
 

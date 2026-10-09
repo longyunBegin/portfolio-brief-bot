@@ -2,7 +2,7 @@ const config = require('./config');
 const { getPositionsAndQuote } = require('./services/brokerService');
 const { buildFallbackHtml } = require('./utils/htmlTemplate');
 const { sendHtmlMail, buildSubject } = require('./services/mailService');
-const { isTradeDate, getPreviousTradeDate, toDateStr, shouldNotifyNow } = require('./utils/tradeDateUtil');
+const { isTradeDate, toDateStr, holidayTableCovers } = require('./utils/tradeDateUtil');
 
 async function run({ force = false, now = new Date(), dryRun = false } = {}) {
   if (!force && config.notify.tradeDayOnly) {
@@ -13,6 +13,10 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
       console.log('[handler] ' + reason);
       return { skipped: true, reason };
     }
+  }
+
+  if (!holidayTableCovers(now)) {
+    console.warn('[handler] 警告: 美股假期表未覆盖今年，请更新 src/utils/tradeDateUtil.js');
   }
 
   console.log('[handler] 开始获取持仓与行情...');
