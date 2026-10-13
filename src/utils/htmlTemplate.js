@@ -127,7 +127,7 @@ function buildHeader(data) {
         <td style="padding:8px 0;border-top:1px solid ${COLOR.border};vertical-align:baseline;">
           <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Total P&amp;L</div>
           <div style="font-size:18px;font-weight:600;color:${pColor};margin-top:2px;">${fmtPct(g.profitPercent)}</div>
-          <div style="font-size:13px;font-weight:500;color:${pColor};margin-top:1px;" class="pnl-amt">${fmtMoney(g.profit, sym, 0, true)}</div>
+          <div style="font-size:13px;font-weight:500;color:${pColor};margin-top:1px;" >${fmtMoney(g.profit, sym, 0, true)}</div>
         </td>
       </tr>`;
   }).join('');
@@ -140,9 +140,6 @@ function buildHeader(data) {
     <div style="font-size:13px;color:${COLOR.sub};margin-top:4px;">${dateStr(tradeDate)} \u00B7 Close Summary \u00B7 per currency, no FX conversion</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:16px;">${rows}</table>
     ${markFoot}
-    <div style="margin-top:14px;">
-      <label for="pnl-toggle" style="display:inline-block;font-size:12px;color:${COLOR.blue};cursor:pointer;user-select:none;">\u25B8 Show P&amp;L &amp; Cost</label>
-    </div>
     </td></tr>
   </table>`;
 }
@@ -205,13 +202,13 @@ function buildPositionRow(p, idx, isLast, ctx) {
     <tr>
       <td style="padding:14px 0;${border}vertical-align:middle;">
         <div style="font-size:15px;font-weight:600;color:${COLOR.text};">${p.code}</div>
-        <div style="font-size:12px;color:${COLOR.sub};margin-top:1px;">${fmtShares(p.holdShares)} shares \u00B7 ${priceStr}<span class="cost-info"> \u00B7 cost ${fmtMoney(p.costPrice, sym, 2)}</span></div>
+        <div style="font-size:12px;color:${COLOR.sub};margin-top:1px;">${fmtShares(p.holdShares)} shares \u00B7 ${priceStr}<span> \u00B7 cost ${fmtMoney(p.costPrice, sym, 2)}</span></div>
         ${missingTag}
       </td>
       <td width="100" style="padding:14px 12px;${border}vertical-align:middle;">${barInner}</td>
       <td width="110" style="padding:14px 0;${border}text-align:right;vertical-align:middle;">
         <div style="font-size:15px;font-weight:600;color:${color};">${fmtPct(p.changePercent)}</div>
-        <div style="font-size:12px;color:${pColor};margin-top:1px;"><span class="pnl-amt">${fmtMoney(p.profit, sym, 0, true)} </span>(${fmtPct(p.profitPercent)})</div>
+        <div style="font-size:12px;color:${pColor};margin-top:1px;"><span>${fmtMoney(p.profit, sym, 0, true)} </span>(${fmtPct(p.profitPercent)})</div>
       </td>
     </tr>
   </table>${chart}`;
@@ -219,6 +216,51 @@ function buildPositionRow(p, idx, isLast, ctx) {
 
 function chartContentId(idx) {
   return `chart-${idx}.png`;
+}
+
+/** Gmail MCP strips ALL <img> (cid / data / https). Use nested tables + bgcolor. */
+function buildHtmlSparkline(bars, opts) {
+  const { prevClose, dayHigh, dayLow, isUp } = opts;
+  const prices = bars.map((b) => b.close).filter(isNum);
+  if (prices.length < 2) return '';
+  const maxBars = 56;
+  let sampled = prices;
+  if (prices.length > maxBars) {
+    const step = prices.length / maxBars;
+    sampled = [];
+    for (let i = 0; i < maxBars; i++) sampled.push(prices[Math.min(prices.length - 1, Math.floor(i * step))]);
+  }
+  let min = Math.min(dayLow, Math.min.apply(null, prices));
+  let max = Math.max(dayHigh, Math.max.apply(null, prices));
+  if (isNum(prevClose) && prevClose > 0) {
+    min = Math.min(min, prevClose);
+    max = Math.max(max, prevClose);
+  }
+  const range = max - min || 1;
+  const H = 48;
+  const barW = 4;
+  const gap = 1;
+  let up = isUp;
+  if (typeof up !== 'boolean') up = sampled[sampled.length - 1] >= sampled[0];
+  const col = up ? COLOR.up : COLOR.down;
+  const cells = sampled.map((p) => {
+    const h = Math.max(2, Math.round(((p - min) / range) * (H - 2)));
+    return `<td valign="bottom" height="${H}" style="height:${H}px;vertical-align:bottom;padding:0;font-size:0;line-height:0;">`
+      + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>`
+      + `<td bgcolor="${col}" width="${barW}" height="${h}" style="width:${barW}px;height:${h}px;font-size:0;line-height:0;">&nbsp;</td>`
+      + `</tr></table></td>`
+      + `<td width="${gap}" style="font-size:0;line-height:0;width:${gap}px;">&nbsp;</td>`;
+  }).join('');
+  // prevClose marker as thin gray column height
+  let prevMark = '';
+  if (isNum(prevClose) && prevClose > 0) {
+    const ph = Math.max(2, Math.round(((prevClose - min) / range) * (H - 2)));
+    prevMark = `<td valign="bottom" height="${H}" style="height:${H}px;vertical-align:bottom;padding:0 0 0 4px;font-size:0;line-height:0;">`
+      + `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>`
+      + `<td bgcolor="${COLOR.flat}" width="2" height="${ph}" style="width:2px;height:${ph}px;font-size:0;line-height:0;">&nbsp;</td>`
+      + `</tr></table></td>`;
+  }
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:400px;"><tr>${cells}${prevMark}</tr></table>`;
 }
 
 function buildIntradayChart(p, idx, ctx) {
@@ -231,28 +273,37 @@ function buildIntradayChart(p, idx, ctx) {
   const midLine = (dayHigh + dayLow) / 2;
   let isUp;
   if (hasPrev && isNum(p.close)) isUp = p.close >= p.prevClose;
-  const pngBuf = buildChartPng(bars, { prevClose: hasPrev ? p.prevClose : null, dayHigh, dayLow, isUp });
-  const contentId = chartContentId(idx);
-  let imgSrc;
-  if (ctx.imageMode === 'dataUri') {
-    imgSrc = `data:image/png;base64,${pngBuf.toString('base64')}`;
+  const chartOpts = { prevClose: hasPrev ? p.prevClose : null, dayHigh, dayLow, isUp };
+
+  let chartInner;
+  if (ctx.imageMode === 'html') {
+    chartInner = buildHtmlSparkline(bars, chartOpts);
   } else {
-    // cid: matches Content-ID / Gmail inline attachment filename
-    imgSrc = `cid:${contentId}`;
-    ctx.attachments.push({
-      filename: contentId,
-      contentId,
-      mimeType: 'image/png',
-      inline: true,
-      content: pngBuf.toString('base64'),
-    });
+    const pngBuf = buildChartPng(bars, chartOpts);
+    const contentId = chartContentId(idx);
+    let imgSrc;
+    if (ctx.imageMode === 'dataUri') {
+      imgSrc = `data:image/png;base64,${pngBuf.toString('base64')}`;
+    } else {
+      // SMTP path: cid + multipart/related (Gmail MCP cannot use this — strips all <img>)
+      imgSrc = `cid:${contentId}`;
+      ctx.attachments.push({
+        filename: contentId,
+        contentId,
+        mimeType: 'image/png',
+        inline: true,
+        content: pngBuf.toString('base64'),
+      });
+    }
+    chartInner = `<img src="${imgSrc}" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="${p.code} chart"/>`;
   }
+
   const prevLabel = hasPrev
     ? `\u00B7 prev <span style="color:${COLOR.text};">${fmtMoney(p.prevClose, sym, 2)}</span>`
     : `\u00B7 prev <span style="color:${COLOR.sub};">N/A</span>`;
   return `
-    <div class="ic-${idx}" style="padding:8px 0 4px;">
-      <img src="${imgSrc}" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="${p.code} chart"/>
+    <div style="padding:8px 0 4px;">
+      ${chartInner}
       <div style="font-size:9px;color:${COLOR.sub};margin-top:3px;">
         High <span style="color:${COLOR.up};font-weight:600;">${fmtMoney(dayHigh, sym, 2)}</span>
         \u00B7 Mid (H+L)/2 <span style="color:${COLOR.sub};">${fmtMoney(midLine, sym, 2)}</span>
@@ -287,13 +338,15 @@ function buildPlainText(data) {
  * Build portfolio brief HTML.
  * @param {object} data
  * @param {object} [opts]
- * @param {'cid'|'dataUri'} [opts.imageMode='cid']
- *   - cid: <img src="cid:chart-N.png"> + attachments[] for Gmail/SMTP inline
- *   - dataUri: embed base64 (local --dry preview.html only; Gmail strips these)
+ * @param {'html'|'cid'|'dataUri'} [opts.imageMode='html']
+ *   - html: table+bgcolor sparklines (Gmail MCP-safe; MCP strips ALL <img>)
+ *   - cid: <img src="cid:chart-N.png"> + attachments[] for SMTP multipart/related
+ *   - dataUri: embed base64 (local --dry preview.html only)
  * @returns {{ html: string, attachments: Array, text: string }}
  */
 function buildFallbackHtml(data, opts = {}) {
-  const imageMode = opts.imageMode === 'dataUri' ? 'dataUri' : 'cid';
+  const mode = opts.imageMode;
+  const imageMode = mode === 'cid' || mode === 'dataUri' ? mode : 'html';
   const ctx = { imageMode, attachments: [] };
   const positions = data.positions || [];
   const header = buildHeader(data);
@@ -301,39 +354,17 @@ function buildFallbackHtml(data, opts = {}) {
   const marketMap = buildMarketMap(positions);
   const rows = positions.map((p, i) => buildPositionRow(p, i, i === positions.length - 1, ctx)).join('');
   const comment = buildComment(data);
-  const chartIndices = positions.map((p, i) => (p.intraday && p.intraday.length > 1 ? i : -1)).filter((i) => i >= 0);
-  // Charts default to display:block so clients without checkbox :checked still show them.
-  // Collapse is progressive enhancement; Gmail often ignores the toggle — charts stay visible.
-  const chartCss = chartIndices.map((i) =>
-    `.ic-${i} { display: block; }\n  #chart-all:checked ~ .pnl-wrap .ic-${i} { display: none; }`
-  ).join('\n  ');
-  const hasCharts = chartIndices.length > 0;
+  // No checkbox toggles: Gmail strips <style>/input/label, leaving fake "Show P&L" text.
+  // P&L amounts and cost are always visible; charts always expanded.
   const html = `
-<style>
-  .pnl-amt { display: none; }
-  #pnl-toggle:checked ~ .pnl-wrap .pnl-amt { display: inline; }
-  .cost-info { display: none; }
-  #pnl-toggle:checked ~ .pnl-wrap .cost-info { display: inline; }
-  .chart-all-expanded { display: none; }
-  #chart-all:checked ~ .pnl-wrap .chart-all-expanded { display: inline; }
-  #chart-all:checked ~ .pnl-wrap .chart-all-collapsed { display: none; }
-  ${chartCss}
-</style>
-<input type="checkbox" id="pnl-toggle" style="display:none;">
-<input type="checkbox" id="chart-all" style="display:none;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="pnl-wrap" bgcolor="${COLOR.bg}" style="border-collapse:collapse;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;background:${COLOR.bg};color:${COLOR.text};">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLOR.bg}" style="border-collapse:collapse;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;background:${COLOR.bg};color:${COLOR.text};">
   <tr><td style="padding:20px;">
   ${header}
   ${missingNote}
   ${marketMap}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
     <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:8px 24px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-      <tr>
-        <td style="padding:8px 0 4px;font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Positions</td>
-        ${hasCharts ? `<td align="right" style="padding:8px 0 4px;"><label for="chart-all" style="font-size:12px;font-weight:500;color:${COLOR.blue};background:rgba(0,113,227,0.08);border-radius:999px;padding:4px 14px;cursor:pointer;user-select:none;"><span class="chart-all-collapsed">Collapse Charts</span><span class="chart-all-expanded">Expand Charts</span></label></td>` : ''}
-      </tr>
-    </table>
+    <div style="padding:8px 0 4px;font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Positions</div>
     ${rows || `<div style="padding:32px 0;text-align:center;color:${COLOR.sub};font-size:14px;">No positions</div>`}
     </td></tr>
   </table>
@@ -354,22 +385,17 @@ function buildFallbackHtml(data, opts = {}) {
 }
 
 /**
- * Gmail / external sender payload: htmlBody with cid: refs + inline attachments.
- * Gmail MCP: pass attachments with { content (base64), filename, mimeType, inline:true }.
- * HTML img src must be cid:<filename> (Content-ID is derived from filename).
+ * Gmail MCP payload. MCP strips every <img> (cid/data/https), so charts are HTML
+ * table sparklines — no attachments. Do not pass CID PNG attachments here.
  */
 function buildGmailPayload(data, { subject } = {}) {
-  const built = buildFallbackHtml(data, { imageMode: 'cid' });
+  const built = buildFallbackHtml(data, { imageMode: 'html' });
   return {
     subject: subject || '',
     body: built.text,
     htmlBody: built.html,
-    attachments: built.attachments.map((a) => ({
-      filename: a.filename,
-      mimeType: a.mimeType,
-      inline: true,
-      content: a.content,
-    })),
+    // intentionally empty: MCP treats "inline" PNGs as downloadable files and drops <img>
+    attachments: [],
   };
 }
 

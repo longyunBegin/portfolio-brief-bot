@@ -87,24 +87,22 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ## 邮件发送：Gmail vs SMTP
 
-Gmail 会剥离 HTML 里的 `data:image/png;base64,...` 内嵌图，以及部分 CSS 背景色。本项目默认把走势图做成 **CID 内联附件**：
+**实测（Grok Bot `user-Gmail` / Gmail MCP）**：发送前会剥离 HTML 里的全部 `<img>`（无论 `cid:`、`data:` 还是 `https:`）。带 `inline: true` 的 PNG 只会变成可下载附件，正文里看不到图。checkbox + `<style>` 切换也会被清掉，留下假的「Show P&L & Cost」文字。
+
+因此两条发送路径用不同图表模式：
 
 | 路径 | 图表方式 | 说明 |
 | --- | --- | --- |
-| **SMTP**（`node src/index.js --force`） | `cid:chart-N.png` + MIME `multipart/related` | 零依赖 SMTP 客户端附带 `Content-ID` 内联 PNG |
-| **Gmail API / Grok Bot** | 同上 HTML + `attachments[]` | 见下方 payload；`inline: true`，`filename` = Content-ID |
-| **本地预览**（`--dry`） | `data:image/...` 写入 `preview.html` | 浏览器可直接打开；同时写出 `send-payload.json` 供 Gmail 发送 |
+| **Gmail API / Grok Bot** | `imageMode=html`：table + `bgcolor` 柱状 sparkline | **无附件**；P&L / cost 始终显示；无折叠按钮 |
+| **SMTP**（`node src/index.js --force`） | `imageMode=cid`：`<img src="cid:chart-N.png">` + MIME `multipart/related` | 真内联 PNG（需 SMTP 可达） |
+| **本地预览**（`--dry`） | `data:image/...` → `preview.html`；`send-payload.json` 为 Gmail 用 html 版 | 浏览器看 PNG；Gmail payload 无附件 |
 
-### Gmail 调用方如何附带 CID 图
+### Gmail 调用方
 
-1. 跑 `node src/index.js --dry --force`，得到 `send-payload.json`（或使用返回的 `gmailPayload`）。
-2. 用 Gmail `send_message`（或等价 API）发送：
-   - `htmlBody`：含 `<img src="cid:chart-0.png">` 的 HTML
-   - `attachments`：每张图 `{ content: "<base64>", filename: "chart-0.png", mimeType: "image/png", inline: true }`
-3. **`filename` 必须与 HTML 里 `cid:` 后的名字一致**（Gmail MCP 用 filename 生成 Content-ID）。
-4. 进度条 / Market Map 使用 `bgcolor` + table，折叠开关在 Gmail 中可能无效，走势图默认展开。
-
-SMTP 路径使用同一套 CID HTML，无需改模板。
+1. 跑 `node src/index.js --dry --force`，得到 `send-payload.json`（`gmailPayload`）。
+2. 用 Gmail `send_message` 发送 `to` / `subject` / `body` / `htmlBody`。
+3. **不要**再传 chart PNG 附件（MCP 会当成普通附件，且仍会剥 `<img>`）。
+4. Market Map / 进度条 / 走势图均用 table + `bgcolor`，兼容 Gmail 清洗。
 
 ## 腾讯云 SCF 部署
 
@@ -116,10 +114,10 @@ SMTP 路径使用同一套 CID HTML，无需改模板。
 
 ### 2026-10-13
 
-- **Gmail 兼容 CID 走势图**：默认 `imageMode=cid`，HTML 使用 `<img src="cid:chart-N.png">`，附件以 inline PNG 发送；Gmail 不再剥图
-- **SMTP multipart/related**：内联 `Content-ID` 图片与 HTML 同信发送；无附件时仍走原来的 multipart/alternative
-- **本地 `--dry`**：`preview.html` 仍用 data-URI 方便浏览器预览；额外写出 `send-payload.json`（Gmail 可用）
-- **样式降级**：Market Map / 进度条 / 卡片改为 table + `bgcolor`，减少 Gmail 剥 CSS 背景的影响；折叠开关不支持时走势图保持展开
+- **Gmail MCP 剥图根因修复**：MCP 剥离所有 `<img>`（cid/data/https）；Gmail 路径改用 HTML table sparkline（`imageMode=html`），不再发假「内联」附件
+- **去掉假按钮**：移除 Show P&L / Collapse Charts 的 checkbox hack；盈亏金额与成本价始终显示
+- **SMTP 仍用 CID PNG**：`multipart/related` + `Content-ID`；本地 `--dry` 的 `preview.html` 仍用 data-URI；`send-payload.json` 为 Gmail html 版（无附件）
+- **样式降级**：Market Map / 进度条 / 卡片 / 走势图均 table + `bgcolor`
 
 ### 2026-10-09
 

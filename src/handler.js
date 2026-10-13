@@ -31,25 +31,21 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
 
   const subject = buildSubject(toDateStr(data.tradeDate), data.summary);
 
-  // Send path: CID inline images (Gmail-safe + SMTP multipart/related).
-  console.log('[handler] 生成 HTML 报告 (imageMode=cid)...');
-  const built = buildFallbackHtml(data, { imageMode: 'cid' });
-  console.log(`[handler] HTML 已生成 (length=${built.html.length}, charts=${built.attachments.length})`);
+  // SMTP: CID PNG via multipart/related. Gmail MCP: HTML table sparklines (MCP strips all <img>).
+  console.log('[handler] 生成 HTML 报告 (SMTP=cid, Gmail=html)...');
+  const builtSmtp = buildFallbackHtml(data, { imageMode: 'cid' });
+  const builtGmail = buildFallbackHtml(data, { imageMode: 'html' });
+  console.log(`[handler] SMTP HTML length=${builtSmtp.html.length} charts=${builtSmtp.attachments.length}; Gmail HTML length=${builtGmail.html.length}`);
 
   const gmailPayload = {
     subject,
-    body: built.text,
-    htmlBody: built.html,
-    attachments: built.attachments.map((a) => ({
-      filename: a.filename,
-      mimeType: a.mimeType,
-      inline: true,
-      content: a.content,
-    })),
+    body: builtGmail.text,
+    htmlBody: builtGmail.html,
+    attachments: [],
   };
 
   if (dryRun) {
-    // Local preview keeps data-URI so opening preview.html in a browser shows charts.
+    // Local preview keeps data-URI so opening preview.html in a browser shows PNG charts.
     const preview = buildFallbackHtml(data, { imageMode: 'dataUri' });
     console.log('[handler] dryRun=true，不发送邮件');
     return {
@@ -57,19 +53,19 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
       dryRun: true,
       subject,
       html: preview.html,
-      text: built.text,
-      attachments: built.attachments,
+      text: builtGmail.text,
+      attachments: builtSmtp.attachments,
       gmailPayload,
       data,
     };
   }
 
-  console.log(`[handler] 发送邮件至 ${config.smtp.to} (${built.attachments.length} inline charts)...`);
+  console.log(`[handler] 发送邮件至 ${config.smtp.to} (${builtSmtp.attachments.length} CID charts)...`);
   const info = await sendHtmlMail({
     subject,
-    html: built.html,
-    text: built.text,
-    attachments: built.attachments,
+    html: builtSmtp.html,
+    text: builtSmtp.text,
+    attachments: builtSmtp.attachments,
   });
   console.log('[handler] 邮件发送完成:', info.messageId || info.response || 'ok');
 
@@ -77,7 +73,7 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
     skipped: false,
     subject,
     messageId: info.messageId,
-    attachmentCount: built.attachments.length,
+    attachmentCount: builtSmtp.attachments.length,
     gmailPayload,
   };
 }
