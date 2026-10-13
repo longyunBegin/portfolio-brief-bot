@@ -135,7 +135,7 @@ function buildHeader(data) {
     ? `<div style="font-size:11px;color:${COLOR.sub};margin-top:6px;">* includes IBKR live mark price where the close was missing</div>` : '';
   return `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:28px 24px;">
+    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:20px 16px;">
     <div style="font-size:24px;font-weight:600;letter-spacing:-0.5px;color:${COLOR.text};">Portfolio Brief</div>
     <div style="font-size:13px;color:${COLOR.sub};margin-top:4px;">${dateStr(tradeDate)} \u00B7 Close Summary \u00B7 per currency, no FX conversion</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-top:16px;">${rows}</table>
@@ -155,22 +155,42 @@ function sortByChange(positions) {
   });
 }
 
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 function buildMarketMap(positions) {
   const sorted = sortByChange(positions);
-  // Table grid survives Gmail better than flex + background-only tiles.
-  const cells = sorted.map((p) => {
-    const color = changeColor(p.changePercent);
-    const bg = changeBg(p.changePercent);
-    return `<td bgcolor="${bg}" style="background:${bg};border-radius:8px;padding:10px 8px;text-align:center;min-width:80px;">
-      <div style="font-size:13px;font-weight:600;color:${COLOR.text};">${p.code}</div>
-      <div style="font-size:13px;font-weight:600;color:${color};margin-top:2px;">${fmtPct(p.changePercent)}</div>
-    </td>`;
-  }).join('<td width="8" style="font-size:0;line-height:0;">&nbsp;</td>');
+  // 4 tiles/row fits ~600px; pad empty cells so columns stay even (no horizontal scroll).
+  const COLS = 4;
+  const rowHtml = chunk(sorted, COLS).map((group, rowIdx) => {
+    const cells = [];
+    for (let i = 0; i < COLS; i++) {
+      const p = group[i];
+      if (!p) {
+        cells.push(`<td width="25%" style="width:25%;padding:3px;font-size:0;line-height:0;">&nbsp;</td>`);
+        continue;
+      }
+      const color = changeColor(p.changePercent);
+      const bg = changeBg(p.changePercent);
+      cells.push(`<td width="25%" style="width:25%;padding:3px;vertical-align:top;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
+          <tr><td bgcolor="${bg}" style="background:${bg};border-radius:8px;padding:10px 4px;text-align:center;">
+            <div style="font-size:12px;font-weight:600;color:${COLOR.text};">${p.code}</div>
+            <div style="font-size:12px;font-weight:600;color:${color};margin-top:2px;">${fmtPct(p.changePercent)}</div>
+          </td></tr>
+        </table>
+      </td>`);
+    }
+    return `<tr>${cells.join('')}</tr>`;
+  }).join('');
   return `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:20px 24px;">
-    <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;">Market Map</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;border-spacing:0;"><tr>${cells}</tr></table>
+    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:16px;">
+    <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Market Map</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">${rowHtml}</table>
     </td></tr>
   </table>`;
 }
@@ -198,32 +218,39 @@ function buildPositionRow(p, idx, isLast, ctx) {
         <td bgcolor="${COLOR.bg}" style="background:${COLOR.bg};height:5px;font-size:0;line-height:0;border-radius:3px;">&nbsp;</td>
       </tr></table>`;
   return `
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
     <tr>
-      <td style="padding:14px 0;${border}vertical-align:middle;">
-        <div style="font-size:15px;font-weight:600;color:${COLOR.text};">${p.code}</div>
-        <div style="font-size:12px;color:${COLOR.sub};margin-top:1px;">${fmtShares(p.holdShares)} shares \u00B7 ${priceStr}<span> \u00B7 cost ${fmtMoney(p.costPrice, sym, 2)}</span></div>
-        ${missingTag}
-      </td>
-      <td width="100" style="padding:14px 12px;${border}vertical-align:middle;">${barInner}</td>
-      <td width="110" style="padding:14px 0;${border}text-align:right;vertical-align:middle;">
-        <div style="font-size:15px;font-weight:600;color:${color};">${fmtPct(p.changePercent)}</div>
-        <div style="font-size:12px;color:${pColor};margin-top:1px;"><span>${fmtMoney(p.profit, sym, 0, true)} </span>(${fmtPct(p.profitPercent)})</div>
+      <td style="padding:12px 0;${border}vertical-align:top;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
+          <tr>
+            <td style="vertical-align:top;">
+              <div style="font-size:15px;font-weight:600;color:${COLOR.text};">${p.code}</div>
+              <div style="font-size:11px;color:${COLOR.sub};margin-top:1px;line-height:1.4;">${fmtShares(p.holdShares)} shares \u00B7 ${priceStr}<br/>cost ${fmtMoney(p.costPrice, sym, 2)}</div>
+              ${missingTag}
+            </td>
+            <td width="96" style="width:96px;text-align:right;vertical-align:top;padding-left:8px;">
+              <div style="font-size:15px;font-weight:600;color:${color};">${fmtPct(p.changePercent)}</div>
+              <div style="font-size:11px;color:${pColor};margin-top:1px;line-height:1.35;">${fmtMoney(p.profit, sym, 0, true)}<br/>(${fmtPct(p.profitPercent)})</div>
+            </td>
+          </tr>
+          <tr><td colspan="2" style="padding-top:8px;">${barInner}</td></tr>
+        </table>
+        ${chart}
       </td>
     </tr>
-  </table>${chart}`;
+  </table>`;
 }
 
 function chartContentId(idx) {
   return `chart-${idx}.png`;
 }
 
-/** Gmail MCP strips ALL <img> (cid / data / https). Use nested tables + bgcolor. */
+/** Gmail MCP strips ALL <img> (cid / data / https). Nested tables + bgcolor only. */
 function buildHtmlSparkline(bars, opts) {
   const { prevClose, dayHigh, dayLow, isUp } = opts;
   const prices = bars.map((b) => b.close).filter(isNum);
   if (prices.length < 2) return '';
-  const maxBars = 56;
+  const maxBars = 36;
   let sampled = prices;
   if (prices.length > maxBars) {
     const step = prices.length / maxBars;
@@ -237,30 +264,24 @@ function buildHtmlSparkline(bars, opts) {
     max = Math.max(max, prevClose);
   }
   const range = max - min || 1;
-  const H = 48;
-  const barW = 4;
-  const gap = 1;
+  const H = 52;
   let up = isUp;
   if (typeof up !== 'boolean') up = sampled[sampled.length - 1] >= sampled[0];
   const col = up ? COLOR.up : COLOR.down;
+  const soft = up ? COLOR.upBg : COLOR.downBg;
+  const n = sampled.length;
+  const pct = (100 / n).toFixed(2);
   const cells = sampled.map((p) => {
-    const h = Math.max(2, Math.round(((p - min) / range) * (H - 2)));
-    return `<td valign="bottom" height="${H}" style="height:${H}px;vertical-align:bottom;padding:0;font-size:0;line-height:0;">`
-      + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>`
-      + `<td bgcolor="${col}" width="${barW}" height="${h}" style="width:${barW}px;height:${h}px;font-size:0;line-height:0;">&nbsp;</td>`
-      + `</tr></table></td>`
-      + `<td width="${gap}" style="font-size:0;line-height:0;width:${gap}px;">&nbsp;</td>`;
-  }).join('');
-  // prevClose marker as thin gray column height
-  let prevMark = '';
-  if (isNum(prevClose) && prevClose > 0) {
-    const ph = Math.max(2, Math.round(((prevClose - min) / range) * (H - 2)));
-    prevMark = `<td valign="bottom" height="${H}" style="height:${H}px;vertical-align:bottom;padding:0 0 0 4px;font-size:0;line-height:0;">`
-      + `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>`
-      + `<td bgcolor="${COLOR.flat}" width="2" height="${ph}" style="width:2px;height:${ph}px;font-size:0;line-height:0;">&nbsp;</td>`
+    const h = Math.max(3, Math.round(((p - min) / range) * (H - 2)));
+    // valign=bottom + nested table: Gmail-safe height (div height often collapses).
+    return `<td width="${pct}%" valign="bottom" height="${H}" bgcolor="${soft}" style="width:${pct}%;height:${H}px;vertical-align:bottom;padding:0 1px 0 0;font-size:0;line-height:0;background:${soft};">`
+      + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;"><tr>`
+      + `<td bgcolor="${col}" height="${h}" style="background:${col};height:${h}px;font-size:0;line-height:0;border-radius:1px 1px 0 0;">&nbsp;</td>`
       + `</tr></table></td>`;
-  }
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;max-width:400px;"><tr>${cells}${prevMark}</tr></table>`;
+  }).join('');
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${soft}" style="border-collapse:collapse;width:100%;background:${soft};border-radius:8px;">
+    <tr>${cells}</tr>
+  </table>`;
 }
 
 function buildIntradayChart(p, idx, ctx) {
@@ -295,20 +316,20 @@ function buildIntradayChart(p, idx, ctx) {
         content: pngBuf.toString('base64'),
       });
     }
-    chartInner = `<img src="${imgSrc}" width="400" height="80" style="display:block;width:100%;max-width:400px;height:auto;border-radius:6px;" alt="${p.code} chart"/>`;
+    chartInner = `<img src="${imgSrc}" width="520" height="80" style="display:block;width:100%;max-width:520px;height:auto;border-radius:6px;" alt="${p.code} chart"/>`;
   }
 
   const prevLabel = hasPrev
-    ? `\u00B7 prev <span style="color:${COLOR.text};">${fmtMoney(p.prevClose, sym, 2)}</span>`
-    : `\u00B7 prev <span style="color:${COLOR.sub};">N/A</span>`;
+    ? `prev <span style="color:${COLOR.text};">${fmtMoney(p.prevClose, sym, 2)}</span>`
+    : `prev <span style="color:${COLOR.sub};">N/A</span>`;
   return `
-    <div style="padding:8px 0 4px;">
+    <div style="padding:10px 0 4px;">
       ${chartInner}
-      <div style="font-size:9px;color:${COLOR.sub};margin-top:3px;">
+      <div style="font-size:10px;color:${COLOR.sub};margin-top:6px;line-height:1.45;">
         High <span style="color:${COLOR.up};font-weight:600;">${fmtMoney(dayHigh, sym, 2)}</span>
-        \u00B7 Mid (H+L)/2 <span style="color:${COLOR.sub};">${fmtMoney(midLine, sym, 2)}</span>
         \u00B7 Low <span style="color:${COLOR.down};font-weight:600;">${fmtMoney(dayLow, sym, 2)}</span>
-        ${prevLabel}
+        \u00B7 Mid <span style="color:${COLOR.sub};">${fmtMoney(midLine, sym, 2)}</span>
+        \u00B7 ${prevLabel}
       </div>
     </div>`;
 }
@@ -356,25 +377,30 @@ function buildFallbackHtml(data, opts = {}) {
   const comment = buildComment(data);
   // No checkbox toggles: Gmail strips <style>/input/label, leaving fake "Show P&L" text.
   // P&L amounts and cost are always visible; charts always expanded.
+  // Outer 100% + inner width=600 / max-width:600px keeps Gmail/mobile from horizontal scroll.
   const html = `
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLOR.bg}" style="border-collapse:collapse;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;max-width:560px;margin:0 auto;background:${COLOR.bg};color:${COLOR.text};">
-  <tr><td style="padding:20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLOR.bg}" style="border-collapse:collapse;background:${COLOR.bg};">
+  <tr><td align="center" style="padding:12px 8px;">
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLOR.bg}" style="border-collapse:collapse;width:100%;max-width:600px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;background:${COLOR.bg};color:${COLOR.text};">
+  <tr><td style="padding:8px 8px 16px;">
   ${header}
   ${missingNote}
   ${marketMap}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:8px 24px;">
+    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:8px 16px;">
     <div style="padding:8px 0 4px;font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Positions</div>
     ${rows || `<div style="padding:32px 0;text-align:center;color:${COLOR.sub};font-size:14px;">No positions</div>`}
     </td></tr>
   </table>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:16px 24px;">
+    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:14px 16px;">
     <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Summary</div>
     <div style="font-size:14px;line-height:1.5;color:${COLOR.text};">${comment}</div>
     </td></tr>
   </table>
   <div style="text-align:center;font-size:11px;color:${COLOR.sub};padding:8px 0;">portfolio-brief-bot</div>
+  </td></tr>
+  </table>
   </td></tr>
 </table>`;
   return {

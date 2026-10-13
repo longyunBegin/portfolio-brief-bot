@@ -114,6 +114,8 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ### 2026-10-13
 
+- **Gmail 版式（~600px）**：外层 `width=600` + `max-width:600px`；Market Map 每行 4 格自动换行；持仓信息上下堆叠，避免手机左右滑
+- **HTML sparkline 可读性**：全宽 table 柱状图 + 软底色；High/Low/Mid/prev 文案换行；仍无 `<img>`（Gmail 会剥）
 - **Gmail MCP 剥图根因修复**：MCP 剥离所有 `<img>`（cid/data/https）；Gmail 路径改用 HTML table sparkline（`imageMode=html`），不再发假「内联」附件
 - **去掉假按钮**：移除 Show P&L / Collapse Charts 的 checkbox hack；盈亏金额与成本价始终显示
 - **SMTP 仍用 CID PNG**：`multipart/related` + `Content-ID`；本地 `--dry` 的 `preview.html` 仍用 data-URI；`send-payload.json` 为 Gmail html 版（无附件）
