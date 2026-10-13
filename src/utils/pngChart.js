@@ -104,28 +104,24 @@ function drawText(c, text, x, y, r, g, b, a) {
   }
 }
 
-// opts: { prevClose: number|null, dayHigh, dayLow, isUp?: boolean }
-// Returns raw PNG Buffer (for CID inline attachments / Gmail).
+// opts: { dayHigh, dayLow, isUp?: boolean }
+// Returns raw PNG Buffer (for CID inline attachments).
+// Style: screenshot-like — line + soft area fill, dashed H (green) / M (gray) / L (red) guides.
 function buildChartPng(bars, opts) {
-  const { prevClose, dayHigh, dayLow } = opts;
-  const hasPrev = typeof prevClose === 'number' && prevClose > 0;
+  const { dayHigh, dayLow } = opts;
   const prices = bars.map((b) => b.close);
-  let min = Math.min(dayLow, Math.min.apply(null, prices));
-  let max = Math.max(dayHigh, Math.max.apply(null, prices));
-  if (hasPrev) {
-    min = Math.min(min, prevClose);
-    max = Math.max(max, prevClose);
-  }
+  const min = Math.min(dayLow, Math.min.apply(null, prices));
+  const max = Math.max(dayHigh, Math.max.apply(null, prices));
   const range = max - min || 1;
   const midLine = (dayHigh + dayLow) / 2;
   const n = bars.length;
-  const W = 400, H = 80;
-  const X0 = 8, X1 = 392, Y0 = 5, Y1 = 72;
+  const W = 520, H = 150;
+  const X0 = 6, X1 = W - 6, Y0 = 10, Y1 = H - 10;
   const chartW = X1 - X0, chartH = Y1 - Y0;
   const c = createCanvas(W, H);
   const isUp = typeof opts.isUp === 'boolean' ? opts.isUp : bars[n - 1].close >= bars[0].close;
   const lc = isUp ? [52, 199, 89] : [255, 59, 48];
-  const ac = isUp ? [232, 248, 237] : [252, 235, 235];
+  const ac = isUp ? [232, 248, 237] : [253, 236, 236];
   const toX = (i) => X0 + (i / (n - 1)) * chartW;
   const toY = (p) => Y0 + (1 - (p - min) / range) * chartH;
   const yAt = (x) => {
@@ -139,10 +135,9 @@ function buildChartPng(bars, opts) {
     const y = Math.round(yAt(x));
     for (let yy = y; yy <= Y1; yy++) setPixel(c, x, yy, ac[0], ac[1], ac[2], 200);
   }
-  drawDashedH(c, toY(dayHigh), 52, 199, 89, 220, X0, X1, 4, 3);
-  drawDashedH(c, toY(dayLow), 255, 59, 48, 220, X0, X1, 4, 3);
-  drawDashedH(c, toY(midLine), 134, 134, 139, 160, X0, X1, 2, 2);
-  if (hasPrev) drawDashedH(c, toY(prevClose), 60, 60, 67, 230, X0, X1, 3, 2);
+  drawDashedH(c, toY(dayHigh), 52, 199, 89, 220, X0, X1, 6, 4);
+  drawDashedH(c, toY(midLine), 199, 199, 204, 220, X0, X1, 2, 3);
+  drawDashedH(c, toY(dayLow), 255, 59, 48, 220, X0, X1, 6, 4);
   for (let i = 0; i < n - 1; i++) drawLine(c, toX(i), toY(bars[i].close), toX(i + 1), toY(bars[i + 1].close), lc[0], lc[1], lc[2], 255);
   return encodePng(W, H, c.pixels);
 }

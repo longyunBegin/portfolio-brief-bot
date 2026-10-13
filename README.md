@@ -91,7 +91,8 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 | 路径 | 图表方式 | 说明 |
 | --- | --- | --- |
-| **Gmail API / Grok Bot** | `imageMode=html`：table + `bgcolor` 柱状 sparkline | **无附件**（MCP 会剥光所有 `<img>`） |
+| **Gmail API / Grok Bot**（`GMAIL_IMAGE_MODE=html`，默认） | `imageMode=html`：table + `bgcolor` 柱状 sparkline | **无附件**（MCP 会剥光所有 `<img>`） |
+| **Gmail API 直接发送**（`GMAIL_IMAGE_MODE=dataUri`） | PNG 以 data-URI 内嵌 | Gmail 网页/手机端正常显示；**仅直接调 Gmail API 时用**，MCP 路径会剥掉图片变空白 |
 | **SMTP**（`node src/index.js --force`） | `imageMode=cid`：`<img src="cid:chart-N.png">` + MIME `multipart/related` | 真内联 PNG（163/QQ 等；需 SMTP 可达） |
 | **本地预览**（`--dry`） | `data:image/...` → `preview.html`；`send-payload.json` 为 Gmail html 版 | 浏览器看 PNG |
 

@@ -31,11 +31,13 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
 
   const subject = buildSubject(toDateStr(data.tradeDate), data.summary);
 
-  // SMTP: CID PNG + checkbox toggles (survives QQ SMTP → 163/Gmail).
-  // Gmail MCP: HTML sparklines, toggles:false (API strips <style>/<label>/<details>/<input>).
-  console.log('[handler] 生成 HTML 报告 (SMTP=cid+toggles, Gmail=html no-toggle-chrome)...');
-  const builtSmtp = buildFallbackHtml(data, { imageMode: 'cid', toggles: true });
-  const builtGmail = buildFallbackHtml(data, { imageMode: 'html', toggles: false });
+  // SMTP: CID PNG. Gmail: dataUri PNG (direct API) or HTML sparklines (MCP-safe).
+  // Toggles act on in-row cost/P&L and charts (checkbox+CSS).
+  console.log('[handler] 生成 HTML 报告 (SMTP=cid, Gmail=' + (process.env.GMAIL_IMAGE_MODE === 'dataUri' ? 'dataUri' : 'html') + ')...');
+  const builtSmtp = buildFallbackHtml(data, { imageMode: 'cid' });
+  const builtGmail = buildFallbackHtml(data, {
+    imageMode: process.env.GMAIL_IMAGE_MODE === 'dataUri' ? 'dataUri' : 'html',
+  });
   console.log(`[handler] SMTP HTML length=${builtSmtp.html.length} charts=${builtSmtp.attachments.length}; Gmail HTML length=${builtGmail.html.length}`);
 
   const gmailPayload = {
