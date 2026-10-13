@@ -57,6 +57,8 @@ scf/
   template.yaml         # 腾讯云 SCF 部署模板
 docs/
   preview_mock.html     # Mock 数据效果图
+tools/
+  send-via-gmail-api.js # Gmail API 直发脚本（绕过 MCP 的 <img> 清洗，需 GMAIL_OAUTH_TOKEN）
 ```
 
 ## 快速开始（本地）
@@ -125,6 +127,10 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ### 2026-10-13
 
+- **截图风格图表**：PNG 重画为 520×150（折线 + 浅色面积填充 + H绿/M灰/L红三条虚线）；持仓行改成大 ticker 在左、进度条 + 百分比在右；图表下标注行改为 `H/M/L/prev`（H 绿、L 红加粗）
+- **Gmail data-URI 图片模式**：`GMAIL_IMAGE_MODE=dataUri` 时 Gmail 版直接内嵌 PNG（data-URI），走 Gmail API 直发图片正常显示；默认 `html` 保持表格迷你图（MCP 安全，Grok Bot 剥 `<img>` 时用）
+- **开关按发送路径区分**：`dataUri`（API 直发，`<style>` 保留）带 Show P&L & Cost / Collapse Charts 开关；`html`（MCP 路径）保持无开关，避免死按钮
+- **新增 `tools/send-via-gmail-api.js`**：零依赖直发脚本，读 `send-payload.json`、拼 raw MIME、直调 Gmail API 发送，绕过 MCP 的 `<img>` 清洗（需 `GMAIL_OAUTH_TOKEN`，gmail.send scope）
 - **双端可用折叠**：同一 HTML 恢复 Show P&L & Cost / Collapse Charts——SMTP/163 走 checkbox+CSS；Gmail（剥 style）走 `<details>`/`<summary>`；有 style 时隐藏 details 回退，避免假按钮叠层
 - **Gmail 版式（~600px）**：外层 `width=600` + `max-width:600px`；Market Map 每行 4 格；持仓与走势分区，避免左右滑
 - **图表双路径**：Gmail API = HTML table sparkline（无附件）；SMTP = CID PNG；`--dry` preview = data-URI
