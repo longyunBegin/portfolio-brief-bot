@@ -12,7 +12,11 @@ function buildSubject(tradeDate, summary) {
   return `[Portfolio Brief] ${tradeDate} P&L ${parts.join(' · ')}${missing}`;
 }
 
-async function sendHtmlMail({ subject, html, to }) {
+/**
+ * Send HTML mail via SMTP.
+ * Pass attachments (CID inline PNGs) when html uses cid:chart-N.png refs.
+ */
+async function sendHtmlMail({ subject, html, text, to, attachments }) {
   const recipients = to || config.smtp.to;
   const info = await smtpDialog({
     host: config.smtp.host,
@@ -24,6 +28,8 @@ async function sendHtmlMail({ subject, html, to }) {
     to: recipients,
     subject,
     html,
+    text,
+    attachments,
   });
   return info;
 }

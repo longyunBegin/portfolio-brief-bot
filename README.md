@@ -41,14 +41,14 @@ src/
   services/
     brokerService.js    # 持仓服务（useMock ? mock : ibkrService）
     ibkrService.js      # IBKR MCP 调用（token rotation + 持仓 + 日K线 + 走势）
-    mailService.js      # SMTP 邮件发送
+    mailService.js      # 邮件发送（SMTP；CID 内联附件）
   utils/
     tradeDateUtil.js    # 美股交易日/工作日判断（含2024-2027节假日）
     summary.js          # 按币种汇总 + 涨跌/持平/缺失计数
-    htmlTemplate.js     # 苹果风格 HTML 模板（板块图+明细+走势图+显隐切换）
-    pngChart.js         # 零依赖 PNG 编码器（走势折线图渲染）
+    htmlTemplate.js     # 苹果风格 HTML 模板（CID/data-URI 走势图 + Gmail 表格布局）
+    pngChart.js         # 零依赖 PNG 编码器（Buffer + base64）
     httpClient.js       # HTTP 客户端
-    smtpClient.js       # SMTP 客户端（base64 折叠修复）
+    smtpClient.js       # SMTP 客户端（multipart/related CID 内联图）
     cosClient.js        # 腾讯云 COS 客户端（零依赖，SHA1 签名）
     envLoader.js        # 极简 .env 解析
 config/
@@ -84,6 +84,28 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 | TRADE_DAY_ONLY | 是否仅交易日发送 |
 | NOTIFY_HOUR / NOTIFY_MINUTE | 发送时刻 |
 
+
+## 邮件发送：Gmail vs SMTP
+
+Gmail 会剥离 HTML 里的 `data:image/png;base64,...` 内嵌图，以及部分 CSS 背景色。本项目默认把走势图做成 **CID 内联附件**：
+
+| 路径 | 图表方式 | 说明 |
+| --- | --- | --- |
+| **SMTP**（`node src/index.js --force`） | `cid:chart-N.png` + MIME `multipart/related` | 零依赖 SMTP 客户端附带 `Content-ID` 内联 PNG |
+| **Gmail API / Grok Bot** | 同上 HTML + `attachments[]` | 见下方 payload；`inline: true`，`filename` = Content-ID |
+| **本地预览**（`--dry`） | `data:image/...` 写入 `preview.html` | 浏览器可直接打开；同时写出 `send-payload.json` 供 Gmail 发送 |
+
+### Gmail 调用方如何附带 CID 图
+
+1. 跑 `node src/index.js --dry --force`，得到 `send-payload.json`（或使用返回的 `gmailPayload`）。
+2. 用 Gmail `send_message`（或等价 API）发送：
+   - `htmlBody`：含 `<img src="cid:chart-0.png">` 的 HTML
+   - `attachments`：每张图 `{ content: "<base64>", filename: "chart-0.png", mimeType: "image/png", inline: true }`
+3. **`filename` 必须与 HTML 里 `cid:` 后的名字一致**（Gmail MCP 用 filename 生成 Content-ID）。
+4. 进度条 / Market Map 使用 `bgcolor` + table，折叠开关在 Gmail 中可能无效，走势图默认展开。
+
+SMTP 路径使用同一套 CID HTML，无需改模板。
+
 ## 腾讯云 SCF 部署
 
 1. 在 SCF 控制台配置环境变量（敏感变量不入模板）
@@ -91,6 +113,13 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 3. Timer 触发器 cron：`0 0 10 * * * *`（每日 10:00），代码内再判断交易日
 
 ## 更新日志
+
+### 2026-10-13
+
+- **Gmail 兼容 CID 走势图**：默认 `imageMode=cid`，HTML 使用 `<img src="cid:chart-N.png">`，附件以 inline PNG 发送；Gmail 不再剥图
+- **SMTP multipart/related**：内联 `Content-ID` 图片与 HTML 同信发送；无附件时仍走原来的 multipart/alternative
+- **本地 `--dry`**：`preview.html` 仍用 data-URI 方便浏览器预览；额外写出 `send-payload.json`（Gmail 可用）
+- **样式降级**：Market Map / 进度条 / 卡片改为 table + `bgcolor`，减少 Gmail 剥 CSS 背景的影响；折叠开关不支持时走势图保持展开
 
 ### 2026-10-09
 
@@ -107,7 +136,7 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ### 2026-09-18（下午）
 
-- **PNG 走势图**：零依赖 PNG 编码器（`zlib` + CRC32 + Bresenham 直线算法），生成 400×80 折线图以 `<img src="data:image/png;base64,...">` 嵌入邮件，所有邮件客户端兼容
+- **PNG 走势图**：零依赖 PNG 编码器（`zlib` + CRC32 + Bresenham 直线算法），生成 400×80 折线图；发送时用 CID 内联（Gmail/SMTP），本地预览仍可用 data-URI
 - **面积填充修复**：逐列插值填充，无间隙，alpha 提高到 200
 - **价格标注 HTML 化**：PNG 不画文字，H/M/L/prev 价格用 HTML 文字标注在图片下方，字体与外部一致
 - **全英文**：邮件主题、按钮文案、切换标签全部改为英文

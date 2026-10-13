@@ -29,22 +29,57 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
     return { skipped: true, reason };
   }
 
-  console.log('[handler] 生成 HTML 报告...');
-  const html = buildFallbackHtml(data);
-  console.log(`[handler] HTML 已生成 (length=${html.length})`);
-
   const subject = buildSubject(toDateStr(data.tradeDate), data.summary);
 
+  // Send path: CID inline images (Gmail-safe + SMTP multipart/related).
+  console.log('[handler] 生成 HTML 报告 (imageMode=cid)...');
+  const built = buildFallbackHtml(data, { imageMode: 'cid' });
+  console.log(`[handler] HTML 已生成 (length=${built.html.length}, charts=${built.attachments.length})`);
+
+  const gmailPayload = {
+    subject,
+    body: built.text,
+    htmlBody: built.html,
+    attachments: built.attachments.map((a) => ({
+      filename: a.filename,
+      mimeType: a.mimeType,
+      inline: true,
+      content: a.content,
+    })),
+  };
+
   if (dryRun) {
+    // Local preview keeps data-URI so opening preview.html in a browser shows charts.
+    const preview = buildFallbackHtml(data, { imageMode: 'dataUri' });
     console.log('[handler] dryRun=true，不发送邮件');
-    return { skipped: false, dryRun: true, subject, html, data };
+    return {
+      skipped: false,
+      dryRun: true,
+      subject,
+      html: preview.html,
+      text: built.text,
+      attachments: built.attachments,
+      gmailPayload,
+      data,
+    };
   }
 
-  console.log(`[handler] 发送邮件至 ${config.smtp.to} ...`);
-  const info = await sendHtmlMail({ subject, html });
+  console.log(`[handler] 发送邮件至 ${config.smtp.to} (${built.attachments.length} inline charts)...`);
+  const info = await sendHtmlMail({
+    subject,
+    html: built.html,
+    text: built.text,
+    attachments: built.attachments,
+  });
   console.log('[handler] 邮件发送完成:', info.messageId || info.response || 'ok');
 
-  return { skipped: false, subject, messageId: info.messageId };
+  return {
+    skipped: false,
+    subject,
+    messageId: info.messageId,
+    attachmentCount: built.attachments.length,
+    gmailPayload,
+  };
 }
 
 module.exports = { run };

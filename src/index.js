@@ -30,9 +30,20 @@ async function runLocal() {
       const path = require('path');
       const out = path.resolve(process.cwd(), 'preview.html');
       fs.writeFileSync(out, result.html, 'utf-8');
-      console.log(`[local] 预览已写入 ${out}`);
+      console.log(`[local] 预览已写入 ${out} (data-URI charts for browser)`);
+
+      // Gmail-ready payload: htmlBody uses cid:chart-N.png; attachments are inline base64.
+      if (result.gmailPayload) {
+        const payloadPath = path.resolve(process.cwd(), 'send-payload.json');
+        fs.writeFileSync(payloadPath, JSON.stringify(result.gmailPayload), 'utf-8');
+        console.log(`[local] Gmail payload 已写入 ${payloadPath} (${(result.gmailPayload.attachments || []).length} inline charts)`);
+      }
     }
-    console.log('[local] 完成:', JSON.stringify({ skipped: result.skipped, dryRun: result.dryRun }));
+    console.log('[local] 完成:', JSON.stringify({
+      skipped: result.skipped,
+      dryRun: result.dryRun,
+      attachmentCount: result.attachmentCount || (result.attachments && result.attachments.length) || 0,
+    }));
   } catch (e) {
     console.error('[local] 执行失败:', e);
     process.exit(1);

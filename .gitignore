@@ -11,4 +11,7 @@ real_data.json
 fetch_real_data.js
 generate_preview.js
 send_test.js
-test_*.js
+test_*.jssend-payload.json
+send-meta.json
+.oauth-state.json
+.mail-out/

@@ -105,9 +105,8 @@ function drawText(c, text, x, y, r, g, b, a) {
 }
 
 // opts: { prevClose: number|null, dayHigh, dayLow, isUp?: boolean }
-// - prev line is drawn only when a real prevClose exists, and the y-range includes it so gaps are visible.
-// - colour: caller decides (close vs prevClose); fallback is last bar vs first bar.
-function buildChartBase64(bars, opts) {
+// Returns raw PNG Buffer (for CID inline attachments / Gmail).
+function buildChartPng(bars, opts) {
   const { prevClose, dayHigh, dayLow } = opts;
   const hasPrev = typeof prevClose === 'number' && prevClose > 0;
   const prices = bars.map((b) => b.close);
@@ -145,7 +144,11 @@ function buildChartBase64(bars, opts) {
   drawDashedH(c, toY(midLine), 134, 134, 139, 160, X0, X1, 2, 2);
   if (hasPrev) drawDashedH(c, toY(prevClose), 60, 60, 67, 230, X0, X1, 3, 2);
   for (let i = 0; i < n - 1; i++) drawLine(c, toX(i), toY(bars[i].close), toX(i + 1), toY(bars[i + 1].close), lc[0], lc[1], lc[2], 255);
-  return encodePng(W, H, c.pixels).toString('base64');
+  return encodePng(W, H, c.pixels);
 }
 
-module.exports = { buildChartBase64 };
+function buildChartBase64(bars, opts) {
+  return buildChartPng(bars, opts).toString('base64');
+}
+
+module.exports = { buildChartPng, buildChartBase64 };
