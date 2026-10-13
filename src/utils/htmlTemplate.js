@@ -127,7 +127,7 @@ function buildHeader(data) {
         <td style="padding:8px 0;border-top:1px solid ${COLOR.border};vertical-align:baseline;">
           <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Total P&amp;L</div>
           <div style="font-size:18px;font-weight:600;color:${pColor};margin-top:2px;">${fmtPct(g.profitPercent)}</div>
-          <div class="pnl-amt" style="display:none;font-size:13px;font-weight:500;color:${pColor};margin-top:1px;">${fmtMoney(g.profit, sym, 0, true)}</div>
+          <div class="pnl-amt" style="font-size:13px;font-weight:500;color:${pColor};margin-top:1px;">${fmtMoney(g.profit, sym, 0, true)}</div>
         </td>
       </tr>`;
   }).join('');
@@ -143,31 +143,6 @@ function buildHeader(data) {
     <div style="margin-top:14px;">
       <label for="pnl-toggle" class="cb-ui" style="display:none;font-size:12px;color:${COLOR.blue};cursor:pointer;user-select:none;">\u25B8 Show P&amp;L &amp; Cost</label>
     </div>
-    </td></tr>
-  </table>`;
-}
-
-/** Gmail fallback: <details> P&L table (shown when <style> is stripped). */
-function buildPnlDetailsFallback(positions) {
-  if (!positions.length) return '';
-  const rows = positions.map((p) => {
-    const sym = currencySymbol(p.currency);
-    const pColor = changeColor(p.profit);
-    return `<tr>
-      <td style="padding:6px 8px 6px 0;border-top:1px solid ${COLOR.border};font-size:13px;font-weight:600;color:${COLOR.text};">${p.code}</td>
-      <td style="padding:6px 8px;border-top:1px solid ${COLOR.border};font-size:12px;color:${COLOR.sub};">cost ${fmtMoney(p.costPrice, sym, 2)}</td>
-      <td style="padding:6px 0;border-top:1px solid ${COLOR.border};font-size:12px;color:${pColor};text-align:right;">${fmtMoney(p.profit, sym, 0, true)} (${fmtPct(p.profitPercent)})</td>
-    </tr>`;
-  }).join('');
-  return `
-  <table role="presentation" class="df-pnl-wrap" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:12px 16px;">
-    <details class="df-pnl">
-      <summary class="details-only" style="font-size:12px;color:${COLOR.blue};cursor:pointer;user-select:none;list-style:none;">\u25B8 Show P&amp;L &amp; Cost</summary>
-      <div class="df-pnl-body" style="margin-top:10px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">${rows}</table>
-      </div>
-    </details>
     </td></tr>
   </table>`;
 }
@@ -221,7 +196,7 @@ function buildMarketMap(positions) {
   </table>`;
 }
 
-function buildPositionRow(p, isLast) {
+function buildPositionRow(p, idx, isLast, ctx) {
   const color = changeColor(p.changePercent);
   const width = barWidth(p.changePercent);
   const sym = currencySymbol(p.currency);
@@ -240,8 +215,9 @@ function buildPositionRow(p, isLast) {
     : `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>
         <td bgcolor="${COLOR.bg}" style="background:${COLOR.bg};height:5px;font-size:0;line-height:0;border-radius:3px;">&nbsp;</td>
       </tr></table>`;
-  // cost + P&L $ hidden by default (inline display:none survives Gmail style-strip;
-  // <style> reveals them when #pnl-toggle:checked on SMTP/163).
+  // cost + absolute P&L: hidden via <style> only (no inline display:none) so
+  // SMTP/163 checkbox can reveal them; Gmail without CSS shows them on the row.
+  const chart = (p.intraday && p.intraday.length > 1) ? buildIntradayChartInner(p, idx, ctx) : '';
   return `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
     <tr>
@@ -250,16 +226,17 @@ function buildPositionRow(p, isLast) {
           <tr>
             <td style="vertical-align:top;">
               <div style="font-size:15px;font-weight:600;color:${COLOR.text};">${p.code}</div>
-              <div style="font-size:11px;color:${COLOR.sub};margin-top:1px;line-height:1.4;">${fmtShares(p.holdShares)} shares \u00B7 ${priceStr}<span class="cost-info" style="display:none;"> \u00B7 cost ${fmtMoney(p.costPrice, sym, 2)}</span></div>
+              <div style="font-size:11px;color:${COLOR.sub};margin-top:1px;line-height:1.4;">${fmtShares(p.holdShares)} shares \u00B7 ${priceStr}<span class="cost-info"> \u00B7 cost ${fmtMoney(p.costPrice, sym, 2)}</span></div>
               ${missingTag}
             </td>
             <td width="96" style="width:96px;text-align:right;vertical-align:top;padding-left:8px;">
               <div style="font-size:15px;font-weight:600;color:${color};">${fmtPct(p.changePercent)}</div>
-              <div style="font-size:11px;color:${pColor};margin-top:1px;line-height:1.35;"><span class="pnl-amt" style="display:none;">${fmtMoney(p.profit, sym, 0, true)} </span>(${fmtPct(p.profitPercent)})</div>
+              <div style="font-size:11px;color:${pColor};margin-top:1px;line-height:1.35;"><span class="pnl-amt">${fmtMoney(p.profit, sym, 0, true)} </span>(${fmtPct(p.profitPercent)})</div>
             </td>
           </tr>
           <tr><td colspan="2" style="padding-top:8px;">${barInner}</td></tr>
         </table>
+        ${chart}
       </td>
     </tr>
   </table>`;
@@ -344,9 +321,9 @@ function buildIntradayChartInner(p, idx, ctx) {
   const prevLabel = hasPrev
     ? `prev <span style="color:${COLOR.text};">${fmtMoney(p.prevClose, sym, 2)}</span>`
     : `prev <span style="color:${COLOR.sub};">N/A</span>`;
+  // Under the position row; Collapse Charts (checkbox) hides .ic-N in place.
   return `
-    <div class="ic-${idx}" style="padding:10px 0 12px;border-bottom:1px solid ${COLOR.border};">
-      <div style="font-size:13px;font-weight:600;color:${COLOR.text};margin-bottom:6px;">${p.code}</div>
+    <div class="ic-${idx}" style="padding:8px 0 2px;">
       ${chartInner}
       <div style="font-size:10px;color:${COLOR.sub};margin-top:6px;line-height:1.45;">
         High <span style="color:${COLOR.up};font-weight:600;">${fmtMoney(dayHigh, sym, 2)}</span>
@@ -357,40 +334,36 @@ function buildIntradayChartInner(p, idx, ctx) {
     </div>`;
 }
 
-/**
- * Charts live in one card so Collapse Charts can be global on both paths:
- * - SMTP/163: checkbox + CSS hides .ic-N
- * - Gmail (style stripped): <details open> summary toggles the whole block
- */
-function buildChartsSection(positions, ctx) {
+/** Chart indices for CSS collapse (charts render under each position row). */
+function collectChartIndices(positions) {
   const chartIndices = [];
-  const parts = [];
   positions.forEach((p, i) => {
-    if (p.intraday && p.intraday.length > 1) {
-      chartIndices.push(i);
-      parts.push(buildIntradayChartInner(p, i, ctx));
-    }
+    if (p.intraday && p.intraday.length > 1) chartIndices.push(i);
   });
-  if (!parts.length) return { html: '', chartIndices: [] };
+  return chartIndices;
+}
 
-  const collapseLabel = `<label for="chart-all" class="cb-ui" style="display:none;font-size:12px;font-weight:500;color:${COLOR.blue};background:rgba(0,113,227,0.08);border-radius:999px;padding:4px 14px;cursor:pointer;user-select:none;"><span class="chart-all-collapsed">Collapse Charts</span><span class="chart-all-expanded">Expand Charts</span></label>`;
-
-  const html = `
+function buildPositionsCard(positions, ctx, chartIndices) {
+  const rows = positions.map((p, i) => buildPositionRow(p, i, i === positions.length - 1, ctx)).join('');
+  const hasCharts = chartIndices.length > 0;
+  // One Collapse Charts control: checkbox+CSS (SMTP/163 + Gmail when <style> kept).
+  // Charts sit under each position row — never a separate dump list.
+  const collapseLabel = hasCharts
+    ? `<label for="chart-all" class="cb-ui" style="display:none;font-size:12px;font-weight:500;color:${COLOR.blue};background:rgba(0,113,227,0.08);border-radius:999px;padding:4px 14px;cursor:pointer;user-select:none;"><span class="chart-all-collapsed">Collapse Charts</span><span class="chart-all-expanded">Expand Charts</span></label>`
+    : '';
+  const body = rows || `<div style="padding:32px 0;text-align:center;color:${COLOR.sub};font-size:14px;">No positions</div>`;
+  return `
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:8px 16px 4px;">
+    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:8px 16px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;">
       <tr>
-        <td style="padding:8px 0 4px;font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Intraday Charts</td>
+        <td style="padding:8px 0 4px;font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Positions</td>
         <td style="padding:8px 0 4px;text-align:right;">${collapseLabel}</td>
       </tr>
     </table>
-    <details class="df-charts" open>
-      <summary class="details-only" style="font-size:12px;font-weight:500;color:${COLOR.blue};background:rgba(0,113,227,0.08);border-radius:999px;padding:4px 14px;cursor:pointer;user-select:none;display:inline-block;list-style:none;margin:4px 0 8px;">Collapse Charts</summary>
-      <div class="charts-inner">${parts.join('')}</div>
-    </details>
+    ${body}
     </td></tr>
   </table>`;
-  return { html, chartIndices };
 }
 
 function buildComment(data) {
@@ -419,15 +392,14 @@ function buildToggleCss(chartIndices) {
     `.ic-${i} { display: block; }\n  #chart-all:checked ~ .pnl-wrap .ic-${i} { display: none !important; }`
   ).join('\n  ');
   return `<style type="text/css">
-  /* Progressive enhancement: when <style> survives (SMTP→163, many webmails),
-     reveal checkbox labels and hide <details> chrome. Gmail MCP strips <style>,
-     so labels stay display:none (inline) and <details>/<summary> remain usable. */
+  /* Dual client (one markup):
+     SMTP→163 / Gmail (when <style> kept): checkbox labels + hide cost/abs P&L and
+     charts on the EXISTING position rows until toggled — no second P&L panel.
+     If <style> stripped: cost/abs P&L stay visible on those same rows; charts stay. */
   .cb-ui { display: inline-block !important; }
-  .details-only { display: none !important; }
-  .df-pnl-wrap { display: none !important; }
-  .df-pnl-body { display: none !important; }
   .pnl-amt { display: none; }
   #pnl-toggle:checked ~ .pnl-wrap .pnl-amt { display: inline !important; }
+  #pnl-toggle:checked ~ .pnl-wrap div.pnl-amt { display: block !important; }
   .cost-info { display: none; }
   #pnl-toggle:checked ~ .pnl-wrap .cost-info { display: inline !important; }
   .chart-all-expanded { display: none; }
@@ -453,13 +425,12 @@ function buildFallbackHtml(data, opts = {}) {
   const ctx = { imageMode, attachments: [] };
   const positions = data.positions || [];
   const header = buildHeader(data);
-  const pnlDetails = buildPnlDetailsFallback(positions);
   const missingNote = buildMissingNote(positions);
   const marketMap = buildMarketMap(positions);
-  const rows = positions.map((p, i) => buildPositionRow(p, i === positions.length - 1)).join('');
-  const charts = buildChartsSection(positions, ctx);
+  const chartIndices = collectChartIndices(positions);
+  const positionsCard = buildPositionsCard(positions, ctx, chartIndices);
   const comment = buildComment(data);
-  const toggleCss = buildToggleCss(charts.chartIndices);
+  const toggleCss = buildToggleCss(chartIndices);
 
   // Checkboxes are previous siblings of .pnl-wrap so :checked ~ .pnl-wrap works.
   const html = `${toggleCss}
@@ -470,23 +441,16 @@ function buildFallbackHtml(data, opts = {}) {
   <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLOR.bg}" style="border-collapse:collapse;width:100%;max-width:600px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',Arial,sans-serif;background:${COLOR.bg};color:${COLOR.text};">
   <tr><td style="padding:8px 8px 16px;">
   ${header}
-  ${pnlDetails}
   ${missingNote}
   ${marketMap}
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
-    <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:8px 16px;">
-    <div style="padding:8px 0 4px;font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;">Positions</div>
-    ${rows || `<div style="padding:32px 0;text-align:center;color:${COLOR.sub};font-size:14px;">No positions</div>`}
-    </td></tr>
-  </table>
-  ${charts.html}
+  ${positionsCard}
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">
     <tr><td bgcolor="${COLOR.card}" style="background:${COLOR.card};border-radius:14px;padding:14px 16px;">
     <div style="font-size:11px;color:${COLOR.sub};text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">Summary</div>
     <div style="font-size:14px;line-height:1.5;color:${COLOR.text};">${comment}</div>
     </td></tr>
   </table>
-  <div style="text-align:center;font-size:11px;color:${COLOR.sub};padding:8px 0;">portfolio-brief-bot \u00B7 toggles: checkbox (SMTP/163) or &lt;details&gt; (Gmail)</div>
+  <div style="text-align:center;font-size:11px;color:${COLOR.sub};padding:8px 0;">portfolio-brief-bot \u00B7 toggles act on position rows (not a second list)</div>
   </td></tr>
   </table>
   </td></tr>

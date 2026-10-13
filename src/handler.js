@@ -31,7 +31,7 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
 
   const subject = buildSubject(toDateStr(data.tradeDate), data.summary);
 
-  // SMTP: CID PNG. Gmail MCP: HTML sparklines (strips <img>). Same HTML toggles: checkbox+CSS or <details>.
+  // SMTP: CID PNG. Gmail MCP: HTML sparklines (strips <img>). Toggles act on in-row cost/P&L and charts (checkbox+CSS).
   console.log('[handler] 生成 HTML 报告 (SMTP=cid, Gmail=html)...');
   const builtSmtp = buildFallbackHtml(data, { imageMode: 'cid' });
   const builtGmail = buildFallbackHtml(data, { imageMode: 'html' });
