@@ -18,3 +18,4 @@ send-meta.json
 .oauth-state.json
 .oauth-result.json
 .mail-out/
+.gmail_oauth_token

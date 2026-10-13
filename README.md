@@ -58,7 +58,7 @@ scf/
 docs/
   preview_mock.html     # Mock 数据效果图
 tools/
-  send-via-gmail-api.js # Gmail API 直发脚本（绕过 MCP 的 <img> 清洗，需 GMAIL_OAUTH_TOKEN）
+  send-via-gmail-api.js # Gmail API 直发 + access/refresh 自动刷新（绕过 MCP 剥样式）
 ```
 
 ## 快速开始（本地）
@@ -85,7 +85,84 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 | COS_BUCKET / COS_REGION / COS_KEY | COS 存储桶信息 |
 | TRADE_DAY_ONLY | 是否仅交易日发送 |
 | NOTIFY_HOUR / NOTIFY_MINUTE | 发送时刻 |
+| GMAIL_IMAGE_MODE | `html`（MCP 安全表格图）/ `dataUri`（API 直发 PNG） |
+| GMAIL_OAUTH_CLIENT_ID / GMAIL_OAUTH_CLIENT_SECRET | Gmail 发件箱 OAuth 客户端（刷新 access token 用） |
+| GMAIL_OAUTH_REFRESH_TOKEN | Gmail refresh token；有 secret 时发信前自动刷新 |
+| GMAIL_OAUTH_TOKEN | Gmail access token（可由脚本自动维护） |
 
+
+
+
+## Gmail 发件箱 OAuth（access / refresh 自动刷新）
+
+例程用 **Gmail 当发件箱** 时，不要走 Grok Bot / MCP 的 `send_message`（会剥掉 `<style>` / `<img>`，折叠按钮和图表验收不过）。请用本仓库的直发脚本：
+
+```bash
+GMAIL_IMAGE_MODE=dataUri node src/index.js --dry --force   # 生成 send-payload.json
+node tools/send-via-gmail-api.js send-payload.json --to ly1653812264@gmail.com
+```
+
+### 为什么能长期跑
+
+Google **access token 约 1 小时过期**。脚本在**每次发信前**若检测到已配置 `GMAIL_OAUTH_REFRESH_TOKEN` + `GMAIL_OAUTH_CLIENT_SECRET`，会先向 `https://oauth2.googleapis.com/token` 用 `grant_type=refresh_token` 换新的 access token，再调用 `users.messages.send`。新 token 会写入：
+
+- `.env` 的 `GMAIL_OAUTH_TOKEN`
+- 本地文件 `.gmail_oauth_token`（已 gitignore）
+
+若 Google 返回新的 refresh_token（rotation），也会写回 `GMAIL_OAUTH_REFRESH_TOKEN`。
+
+仅刷新、不发信：
+
+```bash
+node tools/send-via-gmail-api.js --refresh-only
+```
+
+### 必配环境变量（.env）
+
+| 变量 | 说明 |
+| --- | --- |
+| `GMAIL_OAUTH_CLIENT_ID` | Google Cloud OAuth 客户端 ID（与签发 refresh_token 时相同） |
+| `GMAIL_OAUTH_CLIENT_SECRET` | 同一客户端的 secret（**刷新必需**） |
+| `GMAIL_OAUTH_REFRESH_TOKEN` | 长期凭证；有它 + secret 时发信前自动刷新 |
+| `GMAIL_OAUTH_TOKEN` | 短期 access token；可空，由脚本自动维护 |
+| `GMAIL_IMAGE_MODE=dataUri` | 直发时内嵌 PNG；MCP 路径请用 `html` |
+
+### 怎么拿到 authorization code / refresh_token
+
+**推荐：自有 GCP 客户端（可离线刷新）**
+
+1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 创建项目，启用 **Gmail API**。
+2. 配置 OAuth 同意屏幕；创建 **OAuth 客户端 ID**（应用类型选 **Web application**）。
+3. 把授权重定向 URI 加上：`https://developers.google.com/oauthplayground`
+4. 打开 [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/) → 右上角齿轮 →勾选 **Use your own OAuth credentials** → 填入你的 Client ID / Secret。
+5. 左侧选 **Gmail API v1** → `https://www.googleapis.com/auth/gmail.send` → **Authorize APIs**（用发件邮箱登录，勾选离线权限）。
+6. **Exchange authorization code for tokens**，复制 **Refresh token**（以及可选的 Access token）。
+7. 写入 `.env`：
+
+```bash
+GMAIL_OAUTH_CLIENT_ID=xxxx.apps.googleusercontent.com
+GMAIL_OAUTH_CLIENT_SECRET=xxxx
+GMAIL_OAUTH_REFRESH_TOKEN=1//xxxx
+GMAIL_IMAGE_MODE=dataUri
+```
+
+也可以把 Playground Step 2 里的 **authorization code** 交给脚本兑换（同样不打印密钥）：
+
+```bash
+# .env 里先写好 CLIENT_ID / CLIENT_SECRET
+node tools/send-via-gmail-api.js --exchange-code '4/0A...'   --redirect-uri https://developers.google.com/oauthplayground
+```
+
+脚本会把得到的 `GMAIL_OAUTH_TOKEN` / `GMAIL_OAUTH_REFRESH_TOKEN` 写进 `.env`。
+
+> **注意**：若 refresh_token 是用 OAuth Playground **默认**客户端（`407408718192.apps.googleusercontent.com`）签发的，离线刷新需要该客户端的 secret（Playground 服务端持有，不建议依赖）。长期例程请按上面步骤用**自有 GCP 客户端**重新授权一次，再更新 `.env`。
+
+### 与 MCP 路径的区别
+
+| 路径 | 样式/图片 | Token |
+| --- | --- | --- |
+| `tools/send-via-gmail-api.js`（本脚本） | 完整 HTML + data-URI 图，折叠可用 | access/refresh **自动刷新** |
+| Grok Bot Gmail MCP `send_message` | 剥 `<style>` / `<img>`，验收失败 | MCP 自管，不能用于直发 raw MIME |
 
 ## 邮件发送：Gmail vs SMTP
 
@@ -127,10 +204,11 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ### 2026-10-13
 
+- **Gmail 发件箱自动刷新**：`tools/send-via-gmail-api.js` 在发信前用 `GMAIL_OAUTH_REFRESH_TOKEN` + client_id/secret 换新 access token，并持久化到 `.env` / `.gmail_oauth_token`；支持 `--exchange-code` / `--refresh-only`
 - **截图风格图表**：PNG 重画为 520×150（折线 + 浅色面积填充 + H绿/M灰/L红三条虚线）；持仓行改成大 ticker 在左、进度条 + 百分比在右；图表下标注行改为 `H/M/L/prev`（H 绿、L 红加粗）
 - **Gmail data-URI 图片模式**：`GMAIL_IMAGE_MODE=dataUri` 时 Gmail 版直接内嵌 PNG（data-URI），走 Gmail API 直发图片正常显示；默认 `html` 保持表格迷你图（MCP 安全，Grok Bot 剥 `<img>` 时用）
 - **开关按发送路径区分**：`dataUri`（API 直发，`<style>` 保留）带 Show P&L & Cost / Collapse Charts 开关；`html`（MCP 路径）保持无开关，避免死按钮
-- **新增 `tools/send-via-gmail-api.js`**：零依赖直发脚本，读 `send-payload.json`、拼 raw MIME、直调 Gmail API 发送，绕过 MCP 的 `<img>` 清洗（需 `GMAIL_OAUTH_TOKEN`，gmail.send scope）
+- **新增 `tools/send-via-gmail-api.js`**：零依赖直发脚本，读 `send-payload.json`、拼 raw MIME、直调 Gmail API 发送，绕过 MCP 的 `<img>` 清洗；支持 refresh_token 自动刷新与 authorization code 兑换（gmail.send scope）
 - **双端可用折叠**：同一 HTML 恢复 Show P&L & Cost / Collapse Charts——SMTP/163 走 checkbox+CSS；Gmail（剥 style）走 `<details>`/`<summary>`；有 style 时隐藏 details 回退，避免假按钮叠层
 - **Gmail 版式（~600px）**：外层 `width=600` + `max-width:600px`；Market Map 每行 4 格；持仓与走势分区，避免左右滑
 - **图表双路径**：Gmail API = HTML table sparkline（无附件）；SMTP = CID PNG；`--dry` preview = data-URI
