@@ -32,12 +32,15 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
   const subject = buildSubject(toDateStr(data.tradeDate), data.summary);
 
   // SMTP: CID PNG + checkbox toggles (survives QQ SMTP → 163/Gmail).
-  // Gmail MCP: HTML sparklines, toggles:false (API strips <style>/<label>/<details>/<input>).
-  // Gmail direct API: dataUri PNGs (GMAIL_IMAGE_MODE=dataUri), toggles:false kept.
-  const gmailImageMode = process.env.GMAIL_IMAGE_MODE === 'dataUri' ? 'dataUri' : 'html';
-  console.log(`[handler] 生成 HTML 报告 (SMTP=cid+toggles, Gmail=${gmailImageMode} no-toggle-chrome)...`);
+  // Gmail MCP (imageMode html): toggles:false, API strips <style>/<label>/<details>/<input>.
+  // Gmail direct API (imageMode dataUri): toggles:true, <style> survives.
+  const gmailDirect = process.env.GMAIL_IMAGE_MODE === 'dataUri';
+  console.log(`[handler] 生成 HTML 报告 (SMTP=cid+toggles, Gmail=${gmailDirect ? 'dataUri+toggles' : 'html no-toggle-chrome'})...`);
   const builtSmtp = buildFallbackHtml(data, { imageMode: 'cid', toggles: true });
-  const builtGmail = buildFallbackHtml(data, { imageMode: gmailImageMode, toggles: false });
+  const builtGmail = buildFallbackHtml(data, {
+    imageMode: gmailDirect ? 'dataUri' : 'html',
+    toggles: gmailDirect,
+  });
   console.log(`[handler] SMTP HTML length=${builtSmtp.html.length} charts=${builtSmtp.attachments.length}; Gmail HTML length=${builtGmail.html.length}`);
 
   const gmailPayload = {

@@ -492,10 +492,12 @@ ${toggleInputs}
  */
 function buildGmailPayload(data, { subject, imageMode } = {}) {
   // Gmail MCP strips interactive tags — omit toggle chrome (no dead Collapse/Expand text).
-  // imageMode: 'html' (default, MCP-safe tables) or 'dataUri' (embedded PNGs, direct Gmail API only).
+  // imageMode: 'html' (default, MCP-safe tables) or 'dataUri' (embedded PNGs, direct Gmail API only;
+  //   <style> survives there, so toggles stay on).
+  const direct = imageMode === 'dataUri';
   const built = buildFallbackHtml(data, {
-    imageMode: imageMode === 'dataUri' ? 'dataUri' : 'html',
-    toggles: false,
+    imageMode: direct ? 'dataUri' : 'html',
+    toggles: direct,
   });
   return {
     subject: subject || '',
