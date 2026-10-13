@@ -3,6 +3,7 @@ package-lock.json
 .env
 .ibkr_refresh_token
 preview.html
+preview-gmail.html
 *.log
 *.txt
 .DS_Store
@@ -11,7 +12,9 @@ real_data.json
 fetch_real_data.js
 generate_preview.js
 send_test.js
-test_*.jssend-payload.json
+test_*.js
+send-payload.json
 send-meta.json
 .oauth-state.json
+.oauth-result.json
 .mail-out/

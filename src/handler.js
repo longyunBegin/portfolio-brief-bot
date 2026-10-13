@@ -31,7 +31,7 @@ async function run({ force = false, now = new Date(), dryRun = false } = {}) {
 
   const subject = buildSubject(toDateStr(data.tradeDate), data.summary);
 
-  // SMTP: CID PNG via multipart/related. Gmail MCP: HTML table sparklines (MCP strips all <img>).
+  // SMTP: CID PNG. Gmail MCP: HTML sparklines (strips <img>). Same HTML toggles: checkbox+CSS or <details>.
   console.log('[handler] 生成 HTML 报告 (SMTP=cid, Gmail=html)...');
   const builtSmtp = buildFallbackHtml(data, { imageMode: 'cid' });
   const builtGmail = buildFallbackHtml(data, { imageMode: 'html' });

@@ -87,22 +87,32 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ## 邮件发送：Gmail vs SMTP
 
-**实测（Grok Bot `user-Gmail` / Gmail MCP）**：发送前会剥离 HTML 里的全部 `<img>`（无论 `cid:`、`data:` 还是 `https:`）。带 `inline: true` 的 PNG 只会变成可下载附件，正文里看不到图。checkbox + `<style>` 切换也会被清掉，留下假的「Show P&L & Cost」文字。
-
-因此两条发送路径用不同图表模式：
+**同一套 HTML**同时兼容 163.com 与 Gmail.com 收件；发送路径只决定图表载体：
 
 | 路径 | 图表方式 | 说明 |
 | --- | --- | --- |
-| **Gmail API / Grok Bot** | `imageMode=html`：table + `bgcolor` 柱状 sparkline | **无附件**；P&L / cost 始终显示；无折叠按钮 |
-| **SMTP**（`node src/index.js --force`） | `imageMode=cid`：`<img src="cid:chart-N.png">` + MIME `multipart/related` | 真内联 PNG（需 SMTP 可达） |
-| **本地预览**（`--dry`） | `data:image/...` → `preview.html`；`send-payload.json` 为 Gmail 用 html 版 | 浏览器看 PNG；Gmail payload 无附件 |
+| **Gmail API / Grok Bot** | `imageMode=html`：table + `bgcolor` 柱状 sparkline | **无附件**（MCP 会剥光所有 `<img>`） |
+| **SMTP**（`node src/index.js --force`） | `imageMode=cid`：`<img src="cid:chart-N.png">` + MIME `multipart/related` | 真内联 PNG（163/QQ 等；需 SMTP 可达） |
+| **本地预览**（`--dry`） | `data:image/...` → `preview.html`；`send-payload.json` 为 Gmail html 版 | 浏览器看 PNG |
+
+### 折叠开关（Show P&L & Cost / Collapse Charts）
+
+渐进增强，**不是假按钮**：
+
+1. **SMTP → 163 等保留 `<style>` 的客户端**：checkbox + CSS（`#pnl-toggle` / `#chart-all`）。标签默认 `display:none`，由 `<style>` 显示；P&L$ / cost 默认隐藏，勾选后显示；Collapse Charts 隐藏全部 `.ic-N` 走势块。
+2. **Gmail API（会剥 `<style>` / 弄死 checkbox）**：同一 HTML 里的 `<details>` / `<summary>` 接手——「Show P&L & Cost」展开盈亏表；「Collapse Charts」收起 Intraday Charts 整块。成本/盈亏金额仍用内联 `display:none` 藏在持仓行里，避免剥样式后全裸奔。
+3. 有 `<style>` 时会隐藏 details 回退 UI（`.details-only` / `.df-pnl-wrap`），避免两套控件叠在一起。
 
 ### Gmail 调用方
 
 1. 跑 `node src/index.js --dry --force`，得到 `send-payload.json`（`gmailPayload`）。
 2. 用 Gmail `send_message` 发送 `to` / `subject` / `body` / `htmlBody`。
-3. **不要**再传 chart PNG 附件（MCP 会当成普通附件，且仍会剥 `<img>`）。
-4. Market Map / 进度条 / 走势图均用 table + `bgcolor`，兼容 Gmail 清洗。
+3. **不要**再传 chart PNG 附件。
+4. Market Map / 进度条 / sparkline 均 table + `bgcolor`。
+
+### SMTP 路径说明
+
+本机/盒子若连不上 SMTP（常见 465 出网限制），用 Gmail API 验收 toggles + sparkline；CID PNG 请在 SMTP 可达环境跑 `node src/index.js --force`，或把 `--dry` 的 CID 版交给可达 SMTP 的发送端。
 
 ## 腾讯云 SCF 部署
 
@@ -114,12 +124,10 @@ node src/index.js --force         # 强制发送一次（忽略交易日判断�
 
 ### 2026-10-13
 
-- **Gmail 版式（~600px）**：外层 `width=600` + `max-width:600px`；Market Map 每行 4 格自动换行；持仓信息上下堆叠，避免手机左右滑
-- **HTML sparkline 可读性**：全宽 table 柱状图 + 软底色；High/Low/Mid/prev 文案换行；仍无 `<img>`（Gmail 会剥）
-- **Gmail MCP 剥图根因修复**：MCP 剥离所有 `<img>`（cid/data/https）；Gmail 路径改用 HTML table sparkline（`imageMode=html`），不再发假「内联」附件
-- **去掉假按钮**：移除 Show P&L / Collapse Charts 的 checkbox hack；盈亏金额与成本价始终显示
-- **SMTP 仍用 CID PNG**：`multipart/related` + `Content-ID`；本地 `--dry` 的 `preview.html` 仍用 data-URI；`send-payload.json` 为 Gmail html 版（无附件）
-- **样式降级**：Market Map / 进度条 / 卡片 / 走势图均 table + `bgcolor`
+- **双端可用折叠**：同一 HTML 恢复 Show P&L & Cost / Collapse Charts——SMTP/163 走 checkbox+CSS；Gmail（剥 style）走 `<details>`/`<summary>`；有 style 时隐藏 details 回退，避免假按钮叠层
+- **Gmail 版式（~600px）**：外层 `width=600` + `max-width:600px`；Market Map 每行 4 格；持仓与走势分区，避免左右滑
+- **图表双路径**：Gmail API = HTML table sparkline（无附件）；SMTP = CID PNG；`--dry` preview = data-URI
+- **样式降级**：Market Map / 进度条 / 卡片 / sparkline 均 table + `bgcolor`
 
 ### 2026-10-09
 
