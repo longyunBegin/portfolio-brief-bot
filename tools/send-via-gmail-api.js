@@ -239,13 +239,20 @@ async function resolveAccessToken() {
   );
 }
 
+/** RFC 2047 encode Subject when it contains non-ASCII (e.g. middle dot ·). */
+function encodeSubject(subject) {
+  const s = String(subject ?? '');
+  if (!/[^\x00-\x7F]/.test(s)) return s;
+  return '=?UTF-8?B?' + Buffer.from(s, 'utf8').toString('base64') + '?=';
+}
+
 async function sendMail(args, token) {
   const payload = JSON.parse(fs.readFileSync(args.payload, 'utf8'));
   const subject = args.subject || payload.subject || '(no subject)';
   const html = payload.htmlBody || '';
   const eml = [
     `To: ${args.to}`,
-    `Subject: ${subject}`,
+    `Subject: ${encodeSubject(subject)}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=utf-8',
     'Content-Transfer-Encoding: 8bit',
